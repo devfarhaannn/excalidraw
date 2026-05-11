@@ -4,6 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "generate": "prisma generate",
+    "postinstall": "pnpm run generate",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "exports": {
@@ -19,6 +21,7 @@
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
+    "@types/node": "^22.15.3",
     "dotenv": "^17.4.2"
   }
 }
