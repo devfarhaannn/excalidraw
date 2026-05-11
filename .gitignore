@@ -37,3 +37,7 @@ yarn-error.log*
 # Misc
 .DS_Store
 *.pem
+
+# Backend .env files
+apps/http-backend/.env
+apps/ws-backend/.env

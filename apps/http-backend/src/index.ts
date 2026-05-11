@@ -103,43 +103,68 @@ app.post("/signin", async (req, res) => {
         })
     }
 })
-app.post("/room", middleware, async(req, res) => {
+app.post("/room", middleware, async (req, res) => {
 
-    const {success,data} = CreateRoomSchema.safeParse(req.body)
+    const { success, data } = CreateRoomSchema.safeParse(req.body)
     if (!success) {
         res.status(400).json({
-            success:false,
+            success: false,
             error: "Incorrects roomName"
         })
         return;
     }
     const userId = req.userId
-    if(!userId){
+    if (!userId) {
         res.status(401).json({
-            success:false,
-            error:"Unauthorized"
+            success: false,
+            error: "Unauthorized"
         })
         return
     }
-    try{
+    try {
         const room = await prisma.room.create({
-            data:{
-                slug : data.name,
-                adminId : userId
+            data: {
+                slug: data.name,
+                adminId: userId
             }
         })
         res.status(201).json({
-            success:true,
-            roomId:room.id
+            success: true,
+            roomId: room.id
         })
     }
-   catch(e){
-    res.status(411).json({
-        success:false,
-        error:"Romm is already exist with this room"
-    })
-   }
+    catch (e) {
+        res.status(411).json({
+            success: false,
+            error: "Romm is already exist with this room"
+        })
+    }
 
+})
+app.get("/chats/:roomId", async (req, res) => {
+    const roomId = Number(req.params.roomId)
+    const messages = await prisma.chat.findMany({
+        where: {
+            roomId: roomId
+        }, orderBy: {
+            id: "desc"
+        }, take: 100
+    })
+
+    res.json({
+        messages
+    })
+})
+app.get("/room/:slug", async(req,res) => {
+    const slug = req.params.slug
+    const room = await prisma.room.findFirst({
+        where:{
+            slug
+        }
+    })
+    res.json({
+        room
+    })
 })
 
 app.listen(3001)
