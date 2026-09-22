@@ -15,6 +15,10 @@ interface User {
 
 const users: User[] = [];
 
+
+// CHECK JWT TOKEN
+
+
 function checkUser(token: string): string | null {
     try {
         const decoded = jwt.verify(token, JWT_SECRET);
@@ -28,10 +32,30 @@ function checkUser(token: string): string | null {
         }
 
         return decoded.userId;
-    } catch (error) {
+    } catch {
         return null;
     }
 }
+
+
+// SEND ERROR HELPER
+
+
+function sendError(
+    ws: WebSocket,
+    message: string
+) {
+    ws.send(
+        JSON.stringify({
+            type: "error",
+            message,
+        })
+    );
+}
+
+
+// WEBSOCKET CONNECTION
+
 
 wss.on("connection", (ws, request) => {
 
@@ -42,18 +66,37 @@ wss.on("connection", (ws, request) => {
         return;
     }
 
+    // GET TOKEN FROM URL
+  
+
     const queryParams = new URLSearchParams(
         url.split("?")[1]
     );
 
     const token = queryParams.get("token") || "";
 
+   
+   
+    // VERIFY USER
+   
+
     const userId = checkUser(token);
 
     if (!userId) {
+
+        sendError(
+            ws,
+            "Unauthorized"
+        );
+
         ws.close();
+
         return;
     }
+
+  
+    // CREATE CONNECTED USER
+ 
 
     const user: User = {
         ws,
@@ -63,7 +106,14 @@ wss.on("connection", (ws, request) => {
 
     users.push(user);
 
-    console.log("WebSocket connected:", userId);
+    console.log(
+        "WebSocket connected:",
+        userId
+    );
+
+  
+    // CONNECTION SUCCESS
+ 
 
     ws.send(
         JSON.stringify({
@@ -71,6 +121,10 @@ wss.on("connection", (ws, request) => {
             message: "WebSocket connected successfully",
         })
     );
+
+
+    // HANDLE MESSAGE
+    
 
     ws.on("message", async (data) => {
 
@@ -81,28 +135,53 @@ wss.on("connection", (ws, request) => {
             );
 
 
-
             // JOIN ROOM
-         
+
+
             if (parsedData.type === "join_room") {
 
-                const roomId = Number(parsedData.roomId);
+                const roomId = Number(
+                    parsedData.roomId
+                );
 
-                if (Number.isNaN(roomId)) {
-                    ws.send(
-                        JSON.stringify({
-                            type: "error",
-                            message: "Invalid roomId",
-                        })
+                // Validate roomId
+                if (
+                    !Number.isInteger(roomId) ||
+                    roomId <= 0
+                ) {
+
+                    sendError(
+                        ws,
+                        "Invalid roomId"
                     );
 
                     return;
                 }
 
+                // Check room exists
+                const room =
+                    await prisma.room.findUnique({
+                        where: {
+                            id: roomId,
+                        },
+                    });
+
+                if (!room) {
+
+                    sendError(
+                        ws,
+                        "Room does not exist"
+                    );
+
+                    return;
+                }
+
+                // Prevent duplicate room join
                 if (!user.rooms.includes(roomId)) {
                     user.rooms.push(roomId);
                 }
 
+                // Tell client that room was joined
                 ws.send(
                     JSON.stringify({
                         type: "joined_room",
@@ -117,18 +196,36 @@ wss.on("connection", (ws, request) => {
                 return;
             }
 
-          
+
             // LEAVE ROOM
          
 
             if (parsedData.type === "leave_room") {
 
-                const roomId = Number(parsedData.roomId);
+                const roomId = Number(
+                    parsedData.roomId
+                );
 
+                // Validate roomId
+                if (
+                    !Number.isInteger(roomId) ||
+                    roomId <= 0
+                ) {
+
+                    sendError(
+                        ws,
+                        "Invalid roomId"
+                    );
+
+                    return;
+                }
+
+                // Remove room from user's rooms
                 user.rooms = user.rooms.filter(
                     (id) => id !== roomId
                 );
 
+                // Tell client
                 ws.send(
                     JSON.stringify({
                         type: "left_room",
@@ -143,67 +240,109 @@ wss.on("connection", (ws, request) => {
                 return;
             }
 
-        
+
             // CHAT
-   
+      
 
             if (parsedData.type === "chat") {
 
-                const roomId = Number(parsedData.roomId);
-                const message = parsedData.message;
+                const roomId = Number(
+                    parsedData.roomId
+                );
 
-                if (Number.isNaN(roomId)) {
-                    ws.send(
-                        JSON.stringify({
-                            type: "error",
-                            message: "Invalid roomId",
-                        })
-                    );
+                const message =
+                    typeof parsedData.message === "string"
+                        ? parsedData.message.trim()
+                        : "";
 
-                    return;
-                }
+                
+                // Validate roomId
+                
 
                 if (
-                    typeof message !== "string" ||
-                    message.trim().length === 0
+                    !Number.isInteger(roomId) ||
+                    roomId <= 0
                 ) {
-                    ws.send(
-                        JSON.stringify({
-                            type: "error",
-                            message: "Message cannot be empty",
-                        })
+
+                    sendError(
+                        ws,
+                        "Invalid roomId"
                     );
 
                     return;
                 }
 
-                // Make sure user actually joined this room
+          
+                // Validate message
+             
+                if (!message) {
+
+                    sendError(
+                        ws,
+                        "Message cannot be empty"
+                    );
+
+                    return;
+                }
+
+          
+                // Check user joined room
+            
+
                 if (!user.rooms.includes(roomId)) {
-                    ws.send(
-                        JSON.stringify({
-                            type: "error",
-                            message: "You have not joined this room",
-                        })
+
+                    sendError(
+                        ws,
+                        "You have not joined this room"
                     );
 
                     return;
                 }
 
-                // Save message in database
-                const chat = await prisma.chat.create({
-                    data: {
-                        roomId,
-                        message: message.trim(),
-                        userId,
-                    },
-                });
+              
+                // Check room exists
+   
 
-                // Send message to everyone in this room
+                const room =
+                    await prisma.room.findUnique({
+                        where: {
+                            id: roomId,
+                        },
+                    });
+
+                if (!room) {
+
+                    sendError(
+                        ws,
+                        "Room does not exist"
+                    );
+
+                    return;
+                }
+
+           
+                // SAVE CHAT TO DATABASE
+          
+
+                const chat =
+                    await prisma.chat.create({
+                        data: {
+                            roomId,
+                            message,
+                            userId,
+                        },
+                    });
+
+          
+                // BROADCAST MESSAG
+          
+
                 users.forEach((roomUser) => {
 
                     if (
                         roomUser.rooms.includes(roomId) &&
-                        roomUser.ws.readyState === WebSocket.OPEN
+                        roomUser.ws.readyState ===
+                            WebSocket.OPEN
                     ) {
 
                         roomUser.ws.send(
@@ -212,7 +351,7 @@ wss.on("connection", (ws, request) => {
                                 id: chat.id,
                                 roomId,
                                 message: chat.message,
-                                userId,
+                                userId: chat.userId,
                             })
                         );
                     }
@@ -221,15 +360,12 @@ wss.on("connection", (ws, request) => {
                 return;
             }
 
+            // UNKNOWN MESSAGE TYPE
+   
 
-            // UNKNOWN MESSAGE
-         
-
-            ws.send(
-                JSON.stringify({
-                    type: "error",
-                    message: "Unknown message type",
-                })
+            sendError(
+                ws,
+                "Unknown message type"
             );
 
         } catch (error) {
@@ -239,18 +375,16 @@ wss.on("connection", (ws, request) => {
                 error
             );
 
-            ws.send(
-                JSON.stringify({
-                    type: "error",
-                    message: "Invalid WebSocket message",
-                })
+            sendError(
+                ws,
+                "Invalid WebSocket message"
             );
         }
     });
 
-   
+  
     // DISCONNECT
-   
+ 
 
     ws.on("close", () => {
 
@@ -268,11 +402,12 @@ wss.on("connection", (ws, request) => {
         );
     });
 
-    // -------------------------
+   
     // SOCKET ERROR
-    // -------------------------
+   
 
     ws.on("error", (error) => {
+
         console.error(
             "WebSocket error:",
             error
@@ -280,10 +415,9 @@ wss.on("connection", (ws, request) => {
     });
 });
 
-console.log("WebSocket server running on port 8080");
-
-
-
+console.log(
+    "WebSocket server running on port 8080"
+);
 
 // import { WebSocket, WebSocketServer } from 'ws';
 // import jwt, { JwtPayload } from "jsonwebtoken"
