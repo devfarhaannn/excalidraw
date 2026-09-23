@@ -74,7 +74,7 @@ export function Hero() {
           </Link>
 
           {/* See how it works */}
-          <Link href="#product">
+          <Link href="#how-it-works">
             <Button
               size="lg"
               variant="outline"
@@ -313,7 +313,7 @@ export function Hero() {
 
               </div>
 
-              {/* Farhan cursor */}
+              {/* Neymar cursor */}
               <div className="absolute left-[25%] top-[60%] animate-[cursorFloat_6s_ease-in-out_infinite]">
 
                 <span className="text-2xl text-[#625df5]">
@@ -321,7 +321,7 @@ export function Hero() {
                 </span>
 
                 <span className="ml-1 rounded-full bg-[#625df5] px-2 py-1 text-[9px] text-white">
-                  Farhan
+                  Neymar
                 </span>
 
               </div>
