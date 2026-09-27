@@ -2,7 +2,7 @@
 
 :root {
   --background: #ffffff;
-  --foreground: #17171b;
+  --foreground: #171717;
   --muted: #666666;
   --border: #e8e8e8;
   --accent: #625df5;
@@ -15,6 +15,7 @@
 
 html {
   scroll-behavior: smooth;
+  scroll-padding-top: 88px;
 }
 
 html,
@@ -45,4 +46,55 @@ a {
 ::selection {
   background: #625df5;
   color: white;
+}
+
+/* Floating animation */
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-1deg);
+  }
+
+  50% {
+    transform: translateY(-10px) rotate(1deg);
+  }
+}
+
+/* Collaborative cursor animation */
+@keyframes cursorFloat {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+
+  50% {
+    transform: translate(22px, -12px);
+  }
+}
+
+/* Drawing line animation */
+@keyframes drawLine {
+  0% {
+    stroke-dashoffset: 1000;
+  }
+
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Draivo canvas grid */
+.draivo-grid {
+  background-image:
+    linear-gradient(
+      rgba(98, 93, 245, 0.035) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      rgba(98, 93, 245, 0.035) 1px,
+      transparent 1px
+    );
+
+  background-size: 48px 48px;
 }

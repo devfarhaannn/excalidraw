@@ -252,7 +252,7 @@ export function Features() {
   return (
     <section
       id="features"
-      className="relative overflow-hidden bg-[#fafafa] px-6 py-28 lg:py-36"
+      className="relative overflow-hidden bg-[#fafafa] px-6 pb-28 pt-20 lg:pb-36 lg:pt-24"
     >
       <div className="mx-auto max-w-[1200px]">
 

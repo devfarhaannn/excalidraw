@@ -102,7 +102,7 @@ export function HowItWorks() {
   return (
     <section
       id="how-it-works"
-      className="relative bg-white px-6 py-28 lg:py-36"
+      className="relative bg-white px-6 py-20 lg:py-24"
     >
       <div className="mx-auto max-w-[1200px]">
 

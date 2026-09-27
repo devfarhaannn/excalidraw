@@ -6,7 +6,7 @@ export function About() {
     return (
         <section
             id="about"
-            className="relative overflow-hidden bg-white px-6 py-28 lg:py-36"
+            className="relative overflow-hidden bg-white px-6 py-20 lg:py-24"
         >
             {/* Background decoration */}
             <div className="pointer-events-none absolute -left-40 top-20 h-80 w-80 rounded-full bg-[#625DF5]/[0.06] blur-3xl" />
