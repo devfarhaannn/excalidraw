@@ -1,3 +1,10 @@
 
+import "dotenv/config";
 
-export const JWT_SECRET = process.env.JWT_SECRET || "1231223"
+const jwtSecret = process.env.JWT_SECRET;
+
+if (!jwtSecret) {
+  throw new Error("JWT_SECRET is not configured");
+}
+
+export const JWT_SECRET = jwtSecret;

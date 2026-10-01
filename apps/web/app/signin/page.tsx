@@ -7,7 +7,7 @@ import { motion } from "motion/react";
 import { SigninSchema } from "@repo/common/types";
 import { Button } from "@repo/ui/components/ui/button";
 
-const BACKEND_URL = "http://localhost:3001";
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 
 type FieldErrors = {
   username?: string;

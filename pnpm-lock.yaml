@@ -154,6 +154,10 @@ importers:
         version: 8.18.1
 
   packages/backend-common:
+    dependencies:
+      dotenv:
+        specifier: ^17.4.2
+        version: 17.4.2
     devDependencies:
       '@repo/typescript-config':
         specifier: workspace:*

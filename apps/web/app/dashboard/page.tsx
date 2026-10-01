@@ -10,7 +10,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 
-
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 
 type Accent = "purple" | "orange" | "green";
 
@@ -517,6 +517,56 @@ export default function DashboardPage() {
         // This will later call POST /room.
         setCreateModalOpen(true);
     }
+
+    async function handleSubmitCreateBoard() {
+        const title = boardTitle.trim();
+
+        if (!title) {
+            console.log("Board title is required");
+            return;
+        }
+
+        const token = localStorage.getItem("token");
+
+        if (!token) {
+            console.log("No token found. User is not logged in.");
+            return;
+        }
+
+        try {
+            const response = await fetch(`${BACKEND_URL}/room`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: token,
+                },
+                body: JSON.stringify({
+                    name: title,
+                }),
+            });
+
+            const data = await response.json();
+
+            console.log("Create board response:", {
+                title,
+                type: selectedBoardType,
+                status: response.status,
+                data,
+            });
+
+            if (!response.ok) {
+                console.error("Failed to create board:", data);
+                return;
+            }
+
+            console.log("✅ Board created successfully");
+
+            closeCreateModal();
+        } catch (error) {
+            console.error("❌ Create board request failed:", error);
+        }
+    }
+
     function closeCreateModal() {
         setCreateModalOpen(false);
         setSelectedBoardType("blank");
@@ -557,14 +607,7 @@ export default function DashboardPage() {
                     onBoardTypeChange={setSelectedBoardType}
                     onBoardTitleChange={setBoardTitle}
                     onClose={closeCreateModal}
-                    onCreate={() => {
-                        console.log({
-                            title: boardTitle,
-                            type: selectedBoardType,
-                        });
-
-                        closeCreateModal();
-                    }}
+                    onCreate={handleSubmitCreateBoard}
                 />
             )}
 
