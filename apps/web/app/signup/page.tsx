@@ -73,9 +73,7 @@ export default function SignupPage() {
     setLoading(true);
 
     try {
-      // -----------------------------
-      // 1. Create account
-      // -----------------------------
+   
       const signupResponse = await fetch(`${BACKEND_URL}/signup`, {
         method: "POST",
         headers: {
@@ -92,9 +90,7 @@ export default function SignupPage() {
         );
       }
 
-      // -----------------------------
-      // 2. Automatically sign in
-      // -----------------------------
+  
       const signinResponse = await fetch(`${BACKEND_URL}/signin`, {
         method: "POST",
         headers: {
@@ -115,14 +111,10 @@ export default function SignupPage() {
         );
       }
 
-      // -----------------------------
-      // 3. Save JWT
-      // -----------------------------
+      
       localStorage.setItem("token", signinData.token);
 
-      // -----------------------------
-      // 4. Go to dashboard
-      // -----------------------------
+
       router.push("/dashboard");
     } catch (err) {
       setError(
@@ -137,10 +129,7 @@ export default function SignupPage() {
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#07070B] text-white">
-      {/* =====================================================
-          BACKGROUND
-      ===================================================== */}
-
+      
       <div className="pointer-events-none absolute inset-0">
         {/* Base atmosphere */}
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-10%,rgba(98,93,245,0.30),transparent_38%),radial-gradient(circle_at_0%_100%,rgba(240,140,54,0.16),transparent_30%),radial-gradient(circle_at_100%_100%,rgba(114,230,167,0.14),transparent_28%)]" />
@@ -193,10 +182,7 @@ export default function SignupPage() {
         />
       </div>
 
-      {/* =====================================================
-          DRAWING LINES
-      ===================================================== */}
-
+     
       <svg
         className="pointer-events-none absolute inset-0 h-full w-full opacity-40"
         viewBox="0 0 1440 900"
@@ -243,10 +229,7 @@ export default function SignupPage() {
         />
       </svg>
 
-      {/* =====================================================
-          CONTENT
-      ===================================================== */}
-
+     
       <div className="relative z-10 flex min-h-screen items-center justify-center px-5 py-10 sm:px-8">
         <div className="grid w-full max-w-6xl items-center gap-12 lg:grid-cols-[1fr_430px]">
           {/* =================================================
@@ -502,10 +485,6 @@ export default function SignupPage() {
               Share
             </motion.div>
           </section>
-
-          {/* =================================================
-              SIGNUP CARD
-          ================================================= */}
 
           <section>
             {/* Mobile Logo */}

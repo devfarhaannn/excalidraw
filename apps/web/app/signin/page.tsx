@@ -99,9 +99,6 @@ export default function SigninPage() {
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#07070B] text-white">
-      {/* =====================================================
-          BACKGROUND
-      ===================================================== */}
 
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_15%,rgba(98,93,245,0.24),transparent_28%),radial-gradient(circle_at_85%_20%,rgba(98,93,245,0.14),transparent_25%),radial-gradient(circle_at_75%_90%,rgba(240,140,54,0.10),transparent_28%),radial-gradient(circle_at_20%_90%,rgba(114,230,167,0.08),transparent_25%)]" />
@@ -149,10 +146,6 @@ export default function SigninPage() {
           }}
         />
       </div>
-
-      {/* =====================================================
-          DRAWING LINES
-      ===================================================== */}
 
       <svg
         className="pointer-events-none absolute inset-0 h-full w-full opacity-35"
@@ -206,10 +199,7 @@ export default function SigninPage() {
 
       <div className="relative z-10 flex min-h-screen items-center justify-center px-5 py-10 sm:px-8">
         <div className="grid w-full max-w-6xl items-center gap-14 lg:grid-cols-[1fr_430px]">
-          {/* =================================================
-              LEFT SIDE
-          ================================================= */}
-
+          
           <section className="hidden lg:block">
             <motion.div
               initial={{
@@ -466,10 +456,7 @@ export default function SigninPage() {
             </motion.div>
           </section>
 
-          {/* =================================================
-              SIGNIN CARD
-          ================================================= */}
-
+          
           <section>
             {/* Mobile logo */}
             <motion.div
