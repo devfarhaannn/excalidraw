@@ -320,64 +320,6 @@ function IconSparkles({ className }: IconProps) {
     );
 }
 
-
-const boards: Board[] = [
-    {
-        id: 1,
-        name: "Product Flow",
-        updated: "2 hours ago",
-        collaborators: 4,
-        starred: true,
-        shared: true,
-        accent: "purple",
-    },
-    {
-        id: 2,
-        name: "Website Architecture",
-        updated: "Yesterday",
-        collaborators: 2,
-        starred: false,
-        shared: true,
-        accent: "orange",
-    },
-    {
-        id: 3,
-        name: "Sprint Planning",
-        updated: "2 days ago",
-        collaborators: 6,
-        starred: true,
-        shared: true,
-        accent: "green",
-    },
-    {
-        id: 4,
-        name: "Mobile App",
-        updated: "4 days ago",
-        collaborators: 3,
-        starred: false,
-        shared: false,
-        accent: "purple",
-    },
-    {
-        id: 5,
-        name: "Database Design",
-        updated: "5 days ago",
-        collaborators: 2,
-        starred: true,
-        shared: false,
-        accent: "orange",
-    },
-    {
-        id: 6,
-        name: "Hackathon Ideas",
-        updated: "1 week ago",
-        collaborators: 5,
-        starred: false,
-        shared: true,
-        accent: "green",
-    },
-];
-
 const boardTypes: BoardType[] = [
     {
         id: "blank",
@@ -440,6 +382,7 @@ export default function DashboardPage() {
     const [mobileSidebar, setMobileSidebar] = useState(false);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [checkingAuth, setCheckingAuth] = useState(true);
+    const [boards, setBoards] = useState<Board[]>([]);
     const [currentUser, setCurrentUser] = useState<{
         id: string;
         name: string;
@@ -451,10 +394,7 @@ export default function DashboardPage() {
 
     const [profileModalSection, setProfileModalSection] =
         useState<"profile" | "security">("profile");
-    const [profileName, setProfileName] = useState("");
-    const [savingProfile, setSavingProfile] = useState(false);
-    const [profileError, setProfileError] = useState("");
-    const [profileSuccess, setProfileSuccess] = useState("");
+
     const [pageKey, setPageKey] = useState(0);
     const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -462,6 +402,46 @@ export default function DashboardPage() {
     const [selectedBoardType, setSelectedBoardType] =
         useState<BoardType["id"]>("blank");
     const [boardTitle, setBoardTitle] = useState("");
+    const [createBoardError, setCreateBoardError] = useState("");
+
+    async function fetchBoards(token: string) {
+        const roomsResponse = await fetch(`${BACKEND_URL}/rooms`, {
+            method: "GET",
+            headers: {
+                Authorization: token,
+            },
+        });
+
+        const roomsData = await roomsResponse.json();
+
+        if (!roomsResponse.ok) {
+            console.error("Failed to fetch rooms:", roomsData);
+            return;
+        }
+
+        const mappedBoards: Board[] = roomsData.rooms.map(
+            (
+                room: {
+                    id: number;
+                    slug: string;
+                    createdAt: string;
+                },
+                index: number
+            ) => ({
+                id: room.id,
+                name: room.slug,
+                updated: new Date(room.createdAt).toLocaleDateString(),
+                collaborators: 1,
+                starred: false,
+                shared: false,
+                accent: (["purple", "orange", "green"] as Accent[])[
+                    index % 3
+                ],
+            })
+        );
+
+        setBoards(mappedBoards);
+    }
 
 
     useEffect(() => {
@@ -471,7 +451,6 @@ export default function DashboardPage() {
             router.replace("/signin");
             return;
         }
-
         const fetchCurrentUser = async () => {
             try {
                 const response = await fetch(`${BACKEND_URL}/me`, {
@@ -491,8 +470,10 @@ export default function DashboardPage() {
                 }
 
                 setCurrentUser(data.user);
+
+                await fetchBoards(token);
             } catch (error) {
-                console.error("Failed to fetch current user:", error);
+                console.error("Failed to load dashboard data:", error);
             } finally {
                 setCheckingAuth(false);
             }
@@ -525,7 +506,7 @@ export default function DashboardPage() {
         }
 
         return result;
-    }, [activeTab, search]);
+    }, [activeTab, search, boards]);
 
     useEffect(() => {
         if (createModalOpen || profileModalOpen) {
@@ -575,10 +556,12 @@ export default function DashboardPage() {
 
 
     function handleCreateBoard() {
+        setCreateBoardError("");
         setCreateModalOpen(true);
     }
 
     async function handleSubmitCreateBoard() {
+        setCreateBoardError("");
         const title = boardTitle.trim();
 
         if (!title) {
@@ -615,11 +598,25 @@ export default function DashboardPage() {
             });
 
             if (!response.ok) {
-                console.error("Failed to create board:", data);
+                setCreateBoardError(
+                    data.message || "Unable to create board. Please try again."
+                );
                 return;
             }
 
             console.log("✅ Board created successfully");
+
+            const newBoard: Board = {
+                id: data.room.id,
+                name: data.room.slug,
+                updated: new Date(data.room.createdAt).toLocaleDateString(),
+                collaborators: 1,
+                starred: false,
+                shared: false,
+                accent: "purple",
+            };
+
+            setBoards((prevBoards) => [newBoard, ...prevBoards]);
 
             closeCreateModal();
         } catch (error) {
@@ -631,6 +628,7 @@ export default function DashboardPage() {
         setCreateModalOpen(false);
         setSelectedBoardType("blank");
         setBoardTitle("");
+        setCreateBoardError("");
     }
 
 
@@ -668,6 +666,7 @@ export default function DashboardPage() {
                     onBoardTitleChange={setBoardTitle}
                     onClose={closeCreateModal}
                     onCreate={handleSubmitCreateBoard}
+                    createBoardError={createBoardError}
                 />
             )}
 
@@ -1045,11 +1044,6 @@ export default function DashboardPage() {
                                                     setProfileMenuOpen(false);
 
                                                     setProfileModalSection("profile");
-
-                                                    setProfileName(currentUser?.name ?? "");
-
-                                                    setProfileError("");
-                                                    setProfileSuccess("");
 
                                                     setProfileModalOpen(true);
                                                 }}
@@ -1680,76 +1674,76 @@ function ProfileModal({
     const [passwordSuccess, setPasswordSuccess] =
         useState("");
 
-   async function handleSaveProfile(
-    event: FormEvent<HTMLFormElement>
-) {
-    event.preventDefault();
+    async function handleSaveProfile(
+        event: FormEvent<HTMLFormElement>
+    ) {
+        event.preventDefault();
 
-    const trimmedName = name.trim();
+        const trimmedName = name.trim();
 
-    if (trimmedName.length < 2) {
-        console.error(
-            "Name must be at least 2 characters long."
-        );
-        return;
-    }
-
-    if (trimmedName.length > 50) {
-        console.error(
-            "Name must be less than 50 characters."
-        );
-        return;
-    }
-
-    const token = localStorage.getItem("token");
-
-    if (!token) {
-        console.error("You are not logged in.");
-        return;
-    }
-
-    if (!BACKEND_URL) {
-        console.error("Backend URL is not configured.");
-        return;
-    }
-
-    try {
-        const response = await fetch(`${BACKEND_URL}/me`, {
-            method: "PATCH",
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: token,
-            },
-            body: JSON.stringify({
-                name: trimmedName,
-            }),
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
+        if (trimmedName.length < 2) {
             console.error(
-                "Failed to update profile:",
-                data
+                "Name must be at least 2 characters long."
             );
             return;
         }
 
-        console.log(
-            "Profile updated successfully:",
-            data.user
-        );
+        if (trimmedName.length > 50) {
+            console.error(
+                "Name must be less than 50 characters."
+            );
+            return;
+        }
 
-        onProfileUpdated(data.user);
+        const token = localStorage.getItem("token");
 
-        setName(data.user.name);
-    } catch (error) {
-        console.error(
-            "Update profile request failed:",
-            error
-        );
+        if (!token) {
+            console.error("You are not logged in.");
+            return;
+        }
+
+        if (!BACKEND_URL) {
+            console.error("Backend URL is not configured.");
+            return;
+        }
+
+        try {
+            const response = await fetch(`${BACKEND_URL}/me`, {
+                method: "PATCH",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: token,
+                },
+                body: JSON.stringify({
+                    name: trimmedName,
+                }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                console.error(
+                    "Failed to update profile:",
+                    data
+                );
+                return;
+            }
+
+            console.log(
+                "Profile updated successfully:",
+                data.user
+            );
+
+            onProfileUpdated(data.user);
+
+            setName(data.user.name);
+        } catch (error) {
+            console.error(
+                "Update profile request failed:",
+                error
+            );
+        }
     }
-}
 
     async function handleChangePassword(
         event: FormEvent<HTMLFormElement>
@@ -2361,6 +2355,7 @@ function CreateBoardModal({
     onBoardTitleChange,
     onClose,
     onCreate,
+    createBoardError
 }: {
     selectedBoardType: BoardType["id"];
     boardTitle: string;
@@ -2368,6 +2363,8 @@ function CreateBoardModal({
     onBoardTitleChange: (value: string) => void;
     onClose: () => void;
     onCreate: () => void;
+    createBoardError: string;
+
 }) {
     const selectedType = boardTypes.find(
         (type) => type.id === selectedBoardType
@@ -2510,6 +2507,17 @@ function CreateBoardModal({
                             }
                             className="h-11 w-full rounded-xl border border-black/[0.08] bg-[#fafafd] px-3.5 text-sm text-[#202027] outline-none transition-all placeholder:text-[#aaaab2] focus:border-[#625DF5]/40 focus:bg-white focus:shadow-[0_4px_16px_rgba(98,93,245,.07)]"
                         />
+                        {createBoardError && (
+                            <div className="mt-3 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3.5 py-3">
+                                <div className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                                    !
+                                </div>
+
+                                <p className="text-xs leading-5 text-red-600">
+                                    {createBoardError}
+                                </p>
+                            </div>
+                        )}
 
                         <div className="mt-2 flex items-center justify-between">
                             <p className="text-[10px] text-[#a0a0a8]">

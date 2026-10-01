@@ -104,43 +104,107 @@ app.post("/signin", async (req, res) => {
     }
 })
 app.post("/room", middleware, async (req, res) => {
+    const start = Date.now();
 
-    const { success, data } = CreateRoomSchema.safeParse(req.body)
+    const { success, data } = CreateRoomSchema.safeParse(req.body);
+
     if (!success) {
-        res.status(400).json({
+        return res.status(400).json({
             success: false,
-            error: "Incorrects roomName"
-        })
-        return;
+            error: "Incorrects roomName",
+        });
     }
-    const userId = req.userId
+
+    const userId = req.userId;
+
     if (!userId) {
-        res.status(401).json({
+        return res.status(401).json({
             success: false,
-            error: "Unauthorized"
-        })
-        return
+            error: "Unauthorized",
+        });
     }
+
     try {
+        console.log("Before Prisma:", Date.now() - start, "ms");
+
         const room = await prisma.room.create({
             data: {
                 slug: data.name,
-                adminId: userId
-            }
-        })
-        res.status(201).json({
-            success: true,
-            roomId: room.id
-        })
-    }
-    catch (e) {
-        res.status(411).json({
-            success: false,
-            error: "Romm is already exist with this room"
-        })
-    }
+                adminId: userId,
+            },
+        });
 
-})
+        console.log("After Prisma:", Date.now() - start, "ms");
+
+        return res.status(201).json({
+            success: true,
+            room: {
+                id: room.id,
+                slug: room.slug,
+                createdAt: room.createdAt,
+            },
+        });
+    } catch (e) {
+        console.error("Create room error:", e);
+
+        if (
+            e &&
+            typeof e === "object" &&
+            "code" in e &&
+            e.code === "P2002"
+        ) {
+            return res.status(409).json({
+                success: false,
+                message: "A board with this name already exists.",
+            });
+        }
+
+        return res.status(500).json({
+            success: false,
+            message: "Failed to create board.",
+        });
+    }
+});
+app.get("/rooms", middleware, async (req, res) => {
+    try {
+        const userId = req.userId;
+
+        if (!userId) {
+            return res.status(401).json({
+                success: false,
+                message: "Unauthorized",
+            });
+        }
+
+        const rooms = await prisma.room.findMany({
+            where: {
+                adminId: userId,
+            },
+            select: {
+                id: true,
+                slug: true,
+                adminId: true,
+                createdAt: true,
+            },
+            orderBy: {
+                id: "desc",
+            },
+        });
+
+        return res.status(200).json({
+            success: true,
+            rooms,
+        });
+    } catch (error) {
+        console.error("Failed to fetch rooms:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Failed to fetch rooms",
+        });
+    }
+});
+
 app.get("/me", middleware, async (req, res) => {
     try {
         const user = await prisma.user.findUnique({
@@ -302,10 +366,10 @@ app.get("/chats/:roomId", async (req, res) => {
         messages
     })
 })
-app.get("/room/:slug", async(req,res) => {
+app.get("/room/:slug", async (req, res) => {
     const slug = req.params.slug
     const room = await prisma.room.findFirst({
-        where:{
+        where: {
             slug
         }
     })
