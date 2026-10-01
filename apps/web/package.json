@@ -13,6 +13,7 @@
   "dependencies": {
     "@repo/ui": "workspace:*",
     "@tailwindcss/postcss": "^4.3.3",
+    "motion": "^13.4.6",
     "next": "16.2.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
