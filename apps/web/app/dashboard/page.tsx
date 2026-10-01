@@ -7,6 +7,7 @@ import {
     useRef,
     type ComponentType,
     type ReactNode,
+    type FormEvent
 } from "react";
 import { useRouter } from "next/navigation";
 
@@ -286,6 +287,21 @@ function IconChevronRight({ className }: IconProps) {
         </svg>
     );
 }
+function IconChevronDown({ className }: IconProps) {
+    return (
+        <svg
+            className={className}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        >
+            <path d="m6 9 6 6 6-6" />
+        </svg>
+    );
+}
 
 function IconSparkles({ className }: IconProps) {
     return (
@@ -429,6 +445,16 @@ export default function DashboardPage() {
         name: string;
         email: string;
     } | null>(null);
+    const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+    const [profileModalOpen, setProfileModalOpen] =
+        useState(false);
+
+    const [profileModalSection, setProfileModalSection] =
+        useState<"profile" | "security">("profile");
+    const [profileName, setProfileName] = useState("");
+    const [savingProfile, setSavingProfile] = useState(false);
+    const [profileError, setProfileError] = useState("");
+    const [profileSuccess, setProfileSuccess] = useState("");
     const [pageKey, setPageKey] = useState(0);
     const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -502,7 +528,7 @@ export default function DashboardPage() {
     }, [activeTab, search]);
 
     useEffect(() => {
-        if (createModalOpen) {
+        if (createModalOpen || profileModalOpen) {
             document.body.style.overflow = "hidden";
         } else {
             document.body.style.overflow = "";
@@ -511,7 +537,7 @@ export default function DashboardPage() {
         return () => {
             document.body.style.overflow = "";
         };
-    }, [createModalOpen]);
+    }, [createModalOpen, profileModalOpen]);
 
     useEffect(() => {
         function handleShortcut(event: KeyboardEvent) {
@@ -645,7 +671,17 @@ export default function DashboardPage() {
                 />
             )}
 
-
+            {profileModalOpen && (
+                <ProfileModal
+                    currentUser={currentUser}
+                    activeSection={profileModalSection}
+                    onSectionChange={setProfileModalSection}
+                    onClose={() => setProfileModalOpen(false)}
+                    onProfileUpdated={(updatedUser) => {
+                        setCurrentUser(updatedUser);
+                    }}
+                />
+            )}
 
             {mobileSidebar && (
                 <button
@@ -944,24 +980,159 @@ export default function DashboardPage() {
 
                             <div className="hidden h-6 w-px bg-black/[0.07] sm:block" />
 
-                            <button
-                                type="button"
-                                className="flex items-center gap-2 rounded-xl p-1.5 transition-colors hover:bg-black/[0.035]"
-                            >
-                                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#ecebf9] text-[10px] font-semibold text-[#514cf0]">
-                                    {currentUser ? getInitials(currentUser.name) : "..."}
-                                </div>
+                            <div className="relative">
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        setProfileMenuOpen((value) => !value)
+                                    }
+                                    className="flex items-center gap-2 rounded-xl p-1.5 transition-colors hover:bg-black/[0.035]"
+                                >
+                                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#ecebf9] text-[10px] font-semibold text-[#514cf0]">
+                                        {currentUser
+                                            ? getInitials(currentUser.name)
+                                            : "..."}
+                                    </div>
 
-                                <div className="hidden text-left sm:block">
-                                    <p className="text-xs font-medium text-[#28282e]">
-                                        {currentUser?.name ?? "Loading..."}
-                                    </p>
+                                    <div className="hidden text-left sm:block">
+                                        <p className="text-xs font-medium text-[#28282e]">
+                                            {currentUser?.name ?? "Loading..."}
+                                        </p>
 
-                                    <p className="mt-0.5 text-[10px] text-[#a0a0a9]">
-                                        Personal workspace
-                                    </p>
-                                </div>
-                            </button>
+                                        <p className="mt-0.5 text-[10px] text-[#a0a0a9]">
+                                            Personal workspace
+                                        </p>
+                                    </div>
+
+                                    <IconChevronDown className="hidden h-3.5 w-3.5 text-[#9999a2] sm:block" />
+                                </button>
+
+                                {profileMenuOpen && (
+                                    <div className="absolute right-0 top-[calc(100%+10px)] z-[80] w-[280px] overflow-hidden rounded-2xl border border-black/[0.08] bg-white shadow-[0_18px_45px_rgba(20,20,30,.12)]">
+
+                                        {/* User information */}
+                                        <div className="border-b border-black/[0.07] p-4">
+                                            <div className="flex items-center gap-3">
+
+                                                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#625DF5] text-sm font-semibold text-white">
+                                                    {currentUser
+                                                        ? getInitials(currentUser.name)
+                                                        : "..."}
+                                                </div>
+
+                                                <div className="min-w-0">
+                                                    <p className="truncate text-sm font-semibold text-[#25252c]">
+                                                        {currentUser?.name ??
+                                                            "Loading..."}
+                                                    </p>
+
+                                                    <p className="mt-0.5 truncate text-xs text-[#91919a]">
+                                                        {currentUser?.email ??
+                                                            "Loading..."}
+                                                    </p>
+                                                </div>
+
+                                            </div>
+                                        </div>
+
+
+                                        {/* Account */}
+                                        <div className="p-2">
+
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setProfileMenuOpen(false);
+
+                                                    setProfileModalSection("profile");
+
+                                                    setProfileName(currentUser?.name ?? "");
+
+                                                    setProfileError("");
+                                                    setProfileSuccess("");
+
+                                                    setProfileModalOpen(true);
+                                                }}
+                                                className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-[#4f4f58] transition-colors hover:bg-[#f6f5fb]"
+                                            >
+                                                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#f3f2fd] text-[#625DF5]">
+                                                    <IconUsers className="h-4 w-4" />
+                                                </span>
+
+                                                <span>
+                                                    <span className="block font-medium">
+                                                        Profile
+                                                    </span>
+
+                                                    <span className="mt-0.5 block text-[10px] text-[#a0a0a8]">
+                                                        View your account
+                                                    </span>
+                                                </span>
+                                            </button>
+
+                                        </div>
+
+
+                                        {/* Settings */}
+                                        <div className="border-t border-black/[0.07] p-2">
+
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setProfileMenuOpen(false);
+                                                    changeSection("Settings");
+                                                }}
+                                                className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-[#4f4f58] transition-colors hover:bg-[#f6f5fb]"
+                                            >
+                                                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#f3f2fd] text-[#625DF5]">
+                                                    <IconSettings className="h-4 w-4" />
+                                                </span>
+
+                                                <span>
+                                                    <span className="block font-medium">
+                                                        Settings
+                                                    </span>
+
+                                                    <span className="mt-0.5 block text-[10px] text-[#a0a0a8]">
+                                                        Workspace preferences
+                                                    </span>
+                                                </span>
+                                            </button>
+
+                                        </div>
+
+
+                                        {/* Logout */}
+                                        <div className="border-t border-black/[0.07] p-2">
+
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setProfileMenuOpen(false);
+                                                    handleLogout();
+                                                }}
+                                                className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-[#777783] transition-colors hover:bg-red-50 hover:text-red-600"
+                                            >
+                                                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-50">
+                                                    <IconLogout className="h-4 w-4" />
+                                                </span>
+
+                                                <span>
+                                                    <span className="block font-medium">
+                                                        Logout
+                                                    </span>
+
+                                                    <span className="mt-0.5 block text-[10px] text-[#aaaab2]">
+                                                        Sign out of Draivo
+                                                    </span>
+                                                </span>
+                                            </button>
+
+                                        </div>
+
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </header>
@@ -1202,7 +1373,7 @@ function getPageTitle(section: string) {
             return "Starred boards";
 
         case "Settings":
-            return "Workspace settings";
+            return "Settings";
 
         default:
             return "Your boards";
@@ -1461,36 +1632,618 @@ function MiniNode({
         </div>
     );
 }
+function ProfileModal({
+    currentUser,
+    activeSection,
+    onSectionChange,
+    onClose,
+    onProfileUpdated,
+}: {
+    currentUser: {
+        id: string;
+        name: string;
+        email: string;
+    } | null;
+
+    activeSection: "profile" | "security";
+
+    onSectionChange: (
+        section: "profile" | "security"
+    ) => void;
+
+    onClose: () => void;
+    onProfileUpdated: (user: {
+        id: string;
+        name: string;
+        email: string;
+    }) => void;
+}) {
+    const [name, setName] = useState(
+        currentUser?.name ?? ""
+    );
+
+    const [currentPassword, setCurrentPassword] =
+        useState("");
+
+    const [newPassword, setNewPassword] =
+        useState("");
+
+    const [confirmPassword, setConfirmPassword] =
+        useState("");
+
+    const [changingPassword, setChangingPassword] =
+        useState(false);
+
+    const [passwordError, setPasswordError] =
+        useState("");
+
+    const [passwordSuccess, setPasswordSuccess] =
+        useState("");
+
+   async function handleSaveProfile(
+    event: FormEvent<HTMLFormElement>
+) {
+    event.preventDefault();
+
+    const trimmedName = name.trim();
+
+    if (trimmedName.length < 2) {
+        console.error(
+            "Name must be at least 2 characters long."
+        );
+        return;
+    }
+
+    if (trimmedName.length > 50) {
+        console.error(
+            "Name must be less than 50 characters."
+        );
+        return;
+    }
+
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+        console.error("You are not logged in.");
+        return;
+    }
+
+    if (!BACKEND_URL) {
+        console.error("Backend URL is not configured.");
+        return;
+    }
+
+    try {
+        const response = await fetch(`${BACKEND_URL}/me`, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: token,
+            },
+            body: JSON.stringify({
+                name: trimmedName,
+            }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            console.error(
+                "Failed to update profile:",
+                data
+            );
+            return;
+        }
+
+        console.log(
+            "Profile updated successfully:",
+            data.user
+        );
+
+        onProfileUpdated(data.user);
+
+        setName(data.user.name);
+    } catch (error) {
+        console.error(
+            "Update profile request failed:",
+            error
+        );
+    }
+}
+
+    async function handleChangePassword(
+        event: FormEvent<HTMLFormElement>
+    ) {
+        event.preventDefault();
+
+        setPasswordError("");
+        setPasswordSuccess("");
+
+        if (!currentPassword) {
+            setPasswordError(
+                "Current password is required."
+            );
+            return;
+        }
+
+        if (newPassword.length < 8) {
+            setPasswordError(
+                "New password must be at least 8 characters."
+            );
+            return;
+        }
+
+        if (newPassword !== confirmPassword) {
+            setPasswordError(
+                "New passwords do not match."
+            );
+            return;
+        }
+
+        if (currentPassword === newPassword) {
+            setPasswordError(
+                "New password must be different from current password."
+            );
+            return;
+        }
+
+        const token = localStorage.getItem("token");
+
+        if (!token) {
+            setPasswordError(
+                "You are not logged in."
+            );
+            return;
+        }
+
+        if (!BACKEND_URL) {
+            setPasswordError(
+                "Backend URL is not configured."
+            );
+            return;
+        }
+
+        setChangingPassword(true);
+
+        try {
+            const response = await fetch(
+                `${BACKEND_URL}/password`,
+                {
+                    method: "PATCH",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: token,
+                    },
+                    body: JSON.stringify({
+                        currentPassword,
+                        newPassword,
+                    }),
+                }
+            );
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                setPasswordError(
+                    data?.message ||
+                    "Failed to change password."
+                );
+                return;
+            }
+
+            setPasswordSuccess(
+                "Password changed successfully."
+            );
+
+            setCurrentPassword("");
+            setNewPassword("");
+            setConfirmPassword("");
+
+        } catch (error) {
+            console.error(
+                "Change password request failed:",
+                error
+            );
+
+            setPasswordError(
+                "Something went wrong. Please try again."
+            );
+        } finally {
+            setChangingPassword(false);
+        }
+    }
+
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+
+            {/* Backdrop */}
+            <button
+                type="button"
+                aria-label="Close profile dialog"
+                onClick={onClose}
+                className="absolute inset-0 bg-black/20 backdrop-blur-[3px]"
+            />
+
+            {/* Modal */}
+            <div className="relative z-10 flex max-h-[90vh] w-full max-w-[780px] overflow-hidden rounded-[24px] border border-black/[0.08] bg-white shadow-[0_30px_90px_rgba(20,20,30,.18)]">
+
+                {/* Left side */}
+                <div className="hidden w-[190px] shrink-0 border-r border-black/[0.06] bg-[#fafafd] p-4 sm:block">
+
+                    <div className="mb-6 px-2">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#625DF5]">
+                            Account
+                        </p>
+
+                        <p className="mt-1 text-xs text-[#9898a2]">
+                            Manage your account
+                        </p>
+                    </div>
+
+                    <div className="space-y-1">
+
+                        <button
+                            type="button"
+                            onClick={() =>
+                                onSectionChange("profile")
+                            }
+                            className={[
+                                "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition-all",
+                                activeSection === "profile"
+                                    ? "bg-[#625DF5]/[0.08] font-medium text-[#514cf0]"
+                                    : "text-[#777783] hover:bg-black/[0.035]",
+                            ].join(" ")}
+                        >
+                            <IconUsers className="h-4 w-4" />
+                            Profile
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() =>
+                                onSectionChange("security")
+                            }
+                            className={[
+                                "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition-all",
+                                activeSection === "security"
+                                    ? "bg-[#625DF5]/[0.08] font-medium text-[#514cf0]"
+                                    : "text-[#777783] hover:bg-black/[0.035]",
+                            ].join(" ")}
+                        >
+                            <IconSettings className="h-4 w-4" />
+                            Security
+                        </button>
+
+                    </div>
+                </div>
+
+
+                {/* Right side */}
+                <div className="flex min-w-0 flex-1 flex-col">
+
+                    {/* Header */}
+                    <div className="flex items-start justify-between border-b border-black/[0.06] px-6 py-5">
+
+                        <div>
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#625DF5]">
+                                Account
+                            </p>
+
+                            <h2 className="mt-1.5 text-xl font-semibold tracking-[-0.025em] text-[#1d1d22]">
+                                {activeSection === "profile"
+                                    ? "Profile"
+                                    : "Security"}
+                            </h2>
+
+                            <p className="mt-1 text-xs text-[#90909a]">
+                                {activeSection === "profile"
+                                    ? "Manage your personal information."
+                                    : "Manage your account security."}
+                            </p>
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="flex h-9 w-9 items-center justify-center rounded-lg text-[#8d8d96] transition-colors hover:bg-black/[0.04]"
+                        >
+                            <IconClose className="h-4 w-4" />
+                        </button>
+
+                    </div>
+
+
+                    {/* Mobile section switcher */}
+                    <div className="flex border-b border-black/[0.06] p-2 sm:hidden">
+
+                        <button
+                            type="button"
+                            onClick={() =>
+                                onSectionChange("profile")
+                            }
+                            className={[
+                                "flex-1 rounded-lg px-3 py-2 text-xs font-medium",
+                                activeSection === "profile"
+                                    ? "bg-[#f1efff] text-[#514cf0]"
+                                    : "text-[#777783]",
+                            ].join(" ")}
+                        >
+                            Profile
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() =>
+                                onSectionChange("security")
+                            }
+                            className={[
+                                "flex-1 rounded-lg px-3 py-2 text-xs font-medium",
+                                activeSection === "security"
+                                    ? "bg-[#f1efff] text-[#514cf0]"
+                                    : "text-[#777783]",
+                            ].join(" ")}
+                        >
+                            Security
+                        </button>
+
+                    </div>
+
+
+                    {/* Content */}
+                    <div className="overflow-y-auto px-6 py-6 sm:px-7">
+
+                        {activeSection === "profile" ? (
+                            <form
+                                onSubmit={handleSaveProfile}
+                                className="space-y-6"
+                            >
+
+                                {/* Avatar */}
+                                <div className="flex items-center gap-4 rounded-2xl border border-black/[0.06] bg-[#fafafd] p-5">
+
+                                    <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-[#625DF5] text-lg font-semibold text-white shadow-[0_10px_25px_rgba(98,93,245,.22)]">
+                                        {currentUser
+                                            ? getInitials(
+                                                currentUser.name
+                                            )
+                                            : "..."}
+                                    </div>
+
+                                    <div>
+                                        <p className="text-sm font-semibold text-[#25252c]">
+                                            {currentUser?.name ??
+                                                "Loading..."}
+                                        </p>
+
+                                        <p className="mt-1 text-xs text-[#91919a]">
+                                            {currentUser?.email ??
+                                                "Loading..."}
+                                        </p>
+                                    </div>
+
+                                </div>
+
+
+                                {/* Name */}
+                                <div>
+                                    <label
+                                        htmlFor="profile-name"
+                                        className="mb-2 block text-sm font-medium text-[#303038]"
+                                    >
+                                        Full name
+                                    </label>
+
+                                    <input
+                                        id="profile-name"
+                                        type="text"
+                                        value={name}
+                                        onChange={(event) =>
+                                            setName(
+                                                event.target.value
+                                            )
+                                        }
+                                        className="h-11 w-full rounded-xl border border-black/[0.08] bg-[#fafafd] px-4 text-sm outline-none transition focus:border-[#625DF5]/40 focus:ring-4 focus:ring-[#625DF5]/[0.08]"
+                                    />
+                                </div>
+
+
+                                {/* Email */}
+                                <div>
+                                    <label
+                                        htmlFor="profile-email"
+                                        className="mb-2 block text-sm font-medium text-[#303038]"
+                                    >
+                                        Email address
+                                    </label>
+
+                                    <input
+                                        id="profile-email"
+                                        type="email"
+                                        value={
+                                            currentUser?.email ??
+                                            ""
+                                        }
+                                        readOnly
+                                        className="h-11 w-full rounded-xl border border-black/[0.08] bg-[#f5f5f8] px-4 text-sm text-[#777783] outline-none"
+                                    />
+
+                                    <p className="mt-2 text-[11px] text-[#a0a0a8]">
+                                        Email is currently read-only.
+                                    </p>
+                                </div>
+
+
+                                {/* Save */}
+                                <div className="flex justify-end border-t border-black/[0.06] pt-5">
+
+                                    <button
+                                        type="submit"
+                                        className="rounded-xl bg-[#17171b] px-5 py-2.5 text-sm font-medium text-white transition hover:bg-[#28282d]"
+                                    >
+                                        Save changes
+                                    </button>
+
+                                </div>
+
+                            </form>
+                        ) : (
+                            <form
+                                onSubmit={
+                                    handleChangePassword
+                                }
+                                className="space-y-5"
+                            >
+
+                                <div>
+                                    <label
+                                        htmlFor="profile-current-password"
+                                        className="mb-2 block text-sm font-medium text-[#303038]"
+                                    >
+                                        Current password
+                                    </label>
+
+                                    <input
+                                        id="profile-current-password"
+                                        type="password"
+                                        value={currentPassword}
+                                        onChange={(event) =>
+                                            setCurrentPassword(
+                                                event.target.value
+                                            )
+                                        }
+                                        placeholder="Enter your current password"
+                                        className="h-11 w-full rounded-xl border border-black/[0.08] bg-[#fafafd] px-4 text-sm outline-none transition focus:border-[#625DF5]/40 focus:ring-4 focus:ring-[#625DF5]/[0.08]"
+                                    />
+                                </div>
+
+
+                                <div>
+                                    <label
+                                        htmlFor="profile-new-password"
+                                        className="mb-2 block text-sm font-medium text-[#303038]"
+                                    >
+                                        New password
+                                    </label>
+
+                                    <input
+                                        id="profile-new-password"
+                                        type="password"
+                                        value={newPassword}
+                                        onChange={(event) =>
+                                            setNewPassword(
+                                                event.target.value
+                                            )
+                                        }
+                                        placeholder="Enter your new password"
+                                        className="h-11 w-full rounded-xl border border-black/[0.08] bg-[#fafafd] px-4 text-sm outline-none transition focus:border-[#625DF5]/40 focus:ring-4 focus:ring-[#625DF5]/[0.08]"
+                                    />
+                                </div>
+
+
+                                <div>
+                                    <label
+                                        htmlFor="profile-confirm-password"
+                                        className="mb-2 block text-sm font-medium text-[#303038]"
+                                    >
+                                        Confirm new password
+                                    </label>
+
+                                    <input
+                                        id="profile-confirm-password"
+                                        type="password"
+                                        value={confirmPassword}
+                                        onChange={(event) =>
+                                            setConfirmPassword(
+                                                event.target.value
+                                            )
+                                        }
+                                        placeholder="Re-enter your new password"
+                                        className="h-11 w-full rounded-xl border border-black/[0.08] bg-[#fafafd] px-4 text-sm outline-none transition focus:border-[#625DF5]/40 focus:ring-4 focus:ring-[#625DF5]/[0.08]"
+                                    />
+                                </div>
+
+
+                                {passwordError && (
+                                    <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+                                        {passwordError}
+                                    </div>
+                                )}
+
+
+                                {passwordSuccess && (
+                                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-600">
+                                        {passwordSuccess}
+                                    </div>
+                                )}
+
+
+                                <div className="flex flex-col gap-4 border-t border-black/[0.06] pt-5 sm:flex-row sm:items-center sm:justify-between">
+
+                                    <p className="text-xs leading-5 text-[#9a9aa3]">
+                                        Use at least 8 characters
+                                        for your new password.
+                                    </p>
+
+                                    <button
+                                        type="submit"
+                                        disabled={
+                                            changingPassword
+                                        }
+                                        className="rounded-xl bg-[#17171b] px-5 py-2.5 text-sm font-medium text-white transition hover:bg-[#28282d] disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                        {changingPassword
+                                            ? "Updating..."
+                                            : "Update password"}
+                                    </button>
+
+                                </div>
+
+                            </form>
+                        )}
+
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    );
+}
 
 
 function SettingsPanel() {
     return (
         <section className="mt-8 grid gap-4 lg:grid-cols-[1fr_320px]">
+
+            {/* General settings */}
             <div className="rounded-2xl border border-black/[0.07] bg-white/[0.82] p-6 shadow-[0_4px_18px_rgba(20,20,30,.025)] backdrop-blur-sm sm:p-8">
+
                 <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#625DF5]">
-                        Workspace
+                        General
                     </p>
 
                     <h2 className="mt-2 text-xl font-semibold tracking-tight text-[#202027]">
-                        General settings
+                        Workspace
                     </h2>
 
                     <p className="mt-1 text-sm text-[#8d8d96]">
-                        Manage the basics of your Draivo workspace.
+                        Manage the basic settings for your
+                        Draivo workspace.
                     </p>
                 </div>
 
                 <div className="mt-8 space-y-6">
+
                     <SettingRow
                         title="Workspace name"
-                        description="The name displayed across your workspace."
+                        description="The name displayed for this workspace."
                     >
                         <input
-                            defaultValue="Draivo"
+                            defaultValue="Personal Workspace"
                             className="h-10 w-full max-w-[320px] rounded-lg border border-black/[0.08] bg-[#fafafd] px-3 text-sm outline-none focus:border-[#625DF5]/40"
                         />
                     </SettingRow>
+
 
                     <SettingRow
                         title="Workspace visibility"
@@ -1503,6 +2256,7 @@ function SettingsPanel() {
                         </select>
                     </SettingRow>
 
+
                     <SettingRow
                         title="Email notifications"
                         description="Receive updates about shared boards."
@@ -1511,10 +2265,14 @@ function SettingsPanel() {
                             <div className="ml-auto h-4 w-4 rounded-full bg-white shadow-sm" />
                         </div>
                     </SettingRow>
+
                 </div>
             </div>
 
+
+            {/* Preferences */}
             <div className="rounded-2xl border border-black/[0.07] bg-[#17171b] p-6 text-white shadow-[0_12px_35px_rgba(20,20,30,.08)]">
+
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#625DF5]/20 text-[#9b97ff]">
                     <IconSettings className="h-5 w-5" />
                 </div>
@@ -1524,16 +2282,30 @@ function SettingsPanel() {
                 </h3>
 
                 <p className="mt-2 text-sm leading-6 text-white/40">
-                    More workspace controls will be connected here as the collaboration
-                    system grows.
+                    Workspace preferences and collaboration
+                    controls will be added here as the
+                    workspace system grows.
                 </p>
 
                 <div className="mt-8 space-y-3">
-                    <InfoLine label="Boards" value="12" />
-                    <InfoLine label="Members" value="8" />
-                    <InfoLine label="Storage" value="68%" />
+                    <InfoLine
+                        label="Workspace"
+                        value="Personal"
+                    />
+
+                    <InfoLine
+                        label="Visibility"
+                        value="Private"
+                    />
+
+                    <InfoLine
+                        label="Notifications"
+                        value="On"
+                    />
                 </div>
+
             </div>
+
         </section>
     );
 }
