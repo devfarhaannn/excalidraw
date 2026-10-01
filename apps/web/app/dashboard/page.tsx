@@ -407,7 +407,14 @@ const navigation: {
             icon: IconStar,
         },
     ];
-
+function getInitials(name: string) {
+    return name
+        .trim()
+        .split(/\s+/)
+        .slice(0, 2)
+        .map((part) => part[0]?.toUpperCase() ?? "")
+        .join("");
+}
 
 export default function DashboardPage() {
     const router = useRouter();
@@ -417,6 +424,11 @@ export default function DashboardPage() {
     const [mobileSidebar, setMobileSidebar] = useState(false);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [checkingAuth, setCheckingAuth] = useState(true);
+    const [currentUser, setCurrentUser] = useState<{
+        id: string;
+        name: string;
+        email: string;
+    } | null>(null);
     const [pageKey, setPageKey] = useState(0);
     const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -434,10 +446,34 @@ export default function DashboardPage() {
             return;
         }
 
-        setCheckingAuth(false);
+        const fetchCurrentUser = async () => {
+            try {
+                const response = await fetch(`${BACKEND_URL}/me`, {
+                    method: "GET",
+                    headers: {
+                        Authorization: token,
+                    },
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    console.error("Failed to fetch current user:", data);
+                    localStorage.removeItem("token");
+                    router.replace("/signin");
+                    return;
+                }
+
+                setCurrentUser(data.user);
+            } catch (error) {
+                console.error("Failed to fetch current user:", error);
+            } finally {
+                setCheckingAuth(false);
+            }
+        };
+
+        fetchCurrentUser();
     }, [router]);
-
-
 
     const visibleBoards = useMemo(() => {
         let result = boards;
@@ -513,8 +549,6 @@ export default function DashboardPage() {
 
 
     function handleCreateBoard() {
-        // Temporary.
-        // This will later call POST /room.
         setCreateModalOpen(true);
     }
 
@@ -915,12 +949,12 @@ export default function DashboardPage() {
                                 className="flex items-center gap-2 rounded-xl p-1.5 transition-colors hover:bg-black/[0.035]"
                             >
                                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#ecebf9] text-[10px] font-semibold text-[#514cf0]">
-                                    FB
+                                    {currentUser ? getInitials(currentUser.name) : "..."}
                                 </div>
 
                                 <div className="hidden text-left sm:block">
                                     <p className="text-xs font-medium text-[#28282e]">
-                                        Farhan
+                                        {currentUser?.name ?? "Loading..."}
                                     </p>
 
                                     <p className="mt-0.5 text-[10px] text-[#a0a0a9]">

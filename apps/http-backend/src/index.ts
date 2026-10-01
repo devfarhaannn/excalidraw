@@ -141,6 +141,36 @@ app.post("/room", middleware, async (req, res) => {
     }
 
 })
+app.get("/me", middleware, async (req, res) => {
+    try {
+        const user = await prisma.user.findUnique({
+            where: {
+                id: req.userId,
+            },
+            select: {
+                id: true,
+                name: true,
+                email: true,
+            },
+        });
+
+        if (!user) {
+            return res.status(404).json({
+                message: "User not found",
+            });
+        }
+
+        return res.status(200).json({
+            user,
+        });
+    } catch (error) {
+        console.error("Failed to fetch current user:", error);
+
+        return res.status(500).json({
+            message: "Failed to fetch current user",
+        });
+    }
+});
 app.get("/chats/:roomId", async (req, res) => {
     const roomId = Number(req.params.roomId)
     const messages = await prisma.chat.findMany({
