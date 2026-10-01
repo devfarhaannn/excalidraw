@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@repo/ui": "workspace:*",
+    "@repo/common": "workspace:*",
     "@tailwindcss/postcss": "^4.3.3",
     "motion": "^13.4.6",
     "next": "16.2.0",

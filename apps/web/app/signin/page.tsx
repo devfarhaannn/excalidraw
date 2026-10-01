@@ -4,9 +4,15 @@ import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
+import { SigninSchema } from "@repo/common/types";
 import { Button } from "@repo/ui/components/ui/button";
 
 const BACKEND_URL = "http://localhost:3001";
+
+type FieldErrors = {
+  username?: string;
+  password?: string;
+};
 
 export default function SigninPage() {
   const router = useRouter();
@@ -14,13 +20,48 @@ export default function SigninPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
-  const [loading, setLoading] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  function clearFieldError(field: keyof FieldErrors) {
+    setFieldErrors((prev) => ({
+      ...prev,
+      [field]: undefined,
+    }));
+
+    setError("");
+  }
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
     setError("");
+    setFieldErrors({});
+
+    // Validate using shared SigninSchema
+    const result = SigninSchema.safeParse({
+      username,
+      password,
+    });
+
+    if (!result.success) {
+      const errors: FieldErrors = {};
+
+      for (const issue of result.error.issues) {
+        const field = issue.path[0];
+
+        if (field === "username" || field === "password") {
+          if (!errors[field]) {
+            errors[field] = issue.message;
+          }
+        }
+      }
+
+      setFieldErrors(errors);
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -29,10 +70,7 @@ export default function SigninPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          username,
-          password,
-        }),
+        body: JSON.stringify(result.data),
       });
 
       const data = await response.json();
@@ -43,8 +81,10 @@ export default function SigninPage() {
         );
       }
 
+      // Save JWT
       localStorage.setItem("token", data.token);
 
+      // Go to dashboard
       router.push("/dashboard");
     } catch (err) {
       setError(
@@ -64,13 +104,10 @@ export default function SigninPage() {
       ===================================================== */}
 
       <div className="pointer-events-none absolute inset-0">
-        {/* Main gradient */}
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_15%,rgba(98,93,245,0.24),transparent_28%),radial-gradient(circle_at_85%_20%,rgba(98,93,245,0.14),transparent_25%),radial-gradient(circle_at_75%_90%,rgba(240,140,54,0.10),transparent_28%),radial-gradient(circle_at_20%_90%,rgba(114,230,167,0.08),transparent_25%)]" />
 
-        {/* Grid */}
         <div className="absolute inset-0 opacity-[0.10] [background-image:linear-gradient(rgba(255,255,255,0.055)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.055)_1px,transparent_1px)] [background-size:64px_64px]" />
 
-        {/* Purple glow */}
         <motion.div
           className="absolute -left-32 top-[-100px] h-[460px] w-[460px] rounded-full bg-[#625DF5]/15 blur-[130px]"
           animate={{
@@ -85,7 +122,6 @@ export default function SigninPage() {
           }}
         />
 
-        {/* Right glow */}
         <motion.div
           className="absolute -right-40 top-[35%] h-[420px] w-[420px] rounded-full bg-[#7C65FF]/12 blur-[120px]"
           animate={{
@@ -100,7 +136,6 @@ export default function SigninPage() {
           }}
         />
 
-        {/* Orange glow */}
         <motion.div
           className="absolute bottom-[-180px] left-[34%] h-[380px] w-[380px] rounded-full bg-[#F08C36]/10 blur-[120px]"
           animate={{
@@ -116,7 +151,7 @@ export default function SigninPage() {
       </div>
 
       {/* =====================================================
-          DECORATIVE DRAWING LINES
+          DRAWING LINES
       ===================================================== */}
 
       <svg
@@ -130,8 +165,14 @@ export default function SigninPage() {
           stroke="#625DF5"
           strokeWidth="1.5"
           strokeDasharray="12 18"
-          initial={{ pathLength: 0, opacity: 0 }}
-          animate={{ pathLength: 1, opacity: 0.55 }}
+          initial={{
+            pathLength: 0,
+            opacity: 0,
+          }}
+          animate={{
+            pathLength: 1,
+            opacity: 0.55,
+          }}
           transition={{
             duration: 3,
             ease: "easeInOut",
@@ -143,8 +184,14 @@ export default function SigninPage() {
           stroke="#F08C36"
           strokeWidth="1"
           strokeDasharray="8 16"
-          initial={{ pathLength: 0, opacity: 0 }}
-          animate={{ pathLength: 1, opacity: 0.4 }}
+          initial={{
+            pathLength: 0,
+            opacity: 0,
+          }}
+          animate={{
+            pathLength: 1,
+            opacity: 0.4,
+          }}
           transition={{
             duration: 3.5,
             delay: 0.4,
@@ -164,11 +211,18 @@ export default function SigninPage() {
           ================================================= */}
 
           <section className="hidden lg:block">
-            {/* Logo */}
             <motion.div
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6 }}
+              initial={{
+                opacity: 0,
+                y: 15,
+              }}
+              animate={{
+                opacity: 1,
+                y: 0,
+              }}
+              transition={{
+                duration: 0.6,
+              }}
               className="mb-16 flex items-center gap-3"
             >
               <div className="flex h-11 w-11 items-center justify-center">
@@ -212,10 +266,15 @@ export default function SigninPage() {
               </span>
             </motion.div>
 
-            {/* Main copy */}
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
+              initial={{
+                opacity: 0,
+                y: 20,
+              }}
+              animate={{
+                opacity: 1,
+                y: 0,
+              }}
               transition={{
                 duration: 0.7,
                 delay: 0.1,
@@ -229,6 +288,7 @@ export default function SigninPage() {
               <h1 className="max-w-2xl text-6xl font-semibold leading-[0.98] tracking-[-0.06em] xl:text-7xl">
                 Pick up
                 <br />
+
                 <span className="bg-gradient-to-r from-[#8B86FF] via-[#625DF5] to-[#AFAAFF] bg-clip-text text-transparent">
                   where you left off.
                 </span>
@@ -240,10 +300,7 @@ export default function SigninPage() {
               </p>
             </motion.div>
 
-            {/* =================================================
-                MINI CANVAS
-            ================================================= */}
-
+            {/* Canvas */}
             <motion.div
               initial={{
                 opacity: 0,
@@ -262,10 +319,9 @@ export default function SigninPage() {
               className="relative mt-12 h-[270px] max-w-[650px]"
             >
               <div className="absolute inset-0 overflow-hidden rounded-[30px] border border-white/[0.10] bg-white/[0.035] shadow-[0_30px_100px_rgba(0,0,0,0.35)] backdrop-blur-xl">
-                {/* Grid */}
                 <div className="absolute inset-0 opacity-50 [background-image:linear-gradient(rgba(255,255,255,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.045)_1px,transparent_1px)] [background-size:42px_42px]" />
 
-                {/* Purple card */}
+                {/* Board */}
                 <motion.div
                   className="absolute left-[12%] top-[23%] flex h-[75px] w-[120px] rotate-[-7deg] items-center justify-center rounded-2xl bg-[#625DF5] text-sm font-medium text-white shadow-[0_15px_35px_rgba(98,93,245,0.25)]"
                   animate={{
@@ -281,9 +337,9 @@ export default function SigninPage() {
                   Your board
                 </motion.div>
 
-                {/* Yellow card */}
+                {/* Notes */}
                 <motion.div
-                  className="absolute right-[14%] top-[25%] flex h-[75px] w-[120px] rotate-[5deg] items-center justify-center rounded-2xl bg-[#FFD166] text-sm font-semibold text-[#30280B] shadow-[0_15px_35px_rgba(255,209,102,0.12)]"
+                  className="absolute right-[14%] top-[25%] flex h-[75px] w-[120px] rotate-[5deg] items-center justify-center rounded-2xl bg-[#FFD166] text-sm font-semibold text-[#30280B]"
                   animate={{
                     y: [0, 8, 0],
                     rotate: [5, 7, 5],
@@ -325,7 +381,7 @@ export default function SigninPage() {
                   </div>
                 </motion.div>
 
-                {/* Cursors */}
+                {/* Cursor 1 */}
                 <motion.div
                   className="absolute bottom-[18%] left-[29%]"
                   animate={{
@@ -353,6 +409,7 @@ export default function SigninPage() {
                   </svg>
                 </motion.div>
 
+                {/* Cursor 2 */}
                 <motion.div
                   className="absolute bottom-[21%] right-[28%]"
                   animate={{
@@ -384,30 +441,49 @@ export default function SigninPage() {
             </motion.div>
 
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 1.2 }}
+              initial={{
+                opacity: 0,
+              }}
+              animate={{
+                opacity: 1,
+              }}
+              transition={{
+                delay: 1.2,
+              }}
               className="mt-5 flex items-center gap-3 text-xs text-white/30"
             >
               <span className="h-1.5 w-1.5 rounded-full bg-[#72E6A7]" />
+
               Your workspace
+
               <span>•</span>
+
               Your ideas
+
               <span>•</span>
+
               Your team
             </motion.div>
           </section>
 
           {/* =================================================
-              SIGNIN
+              SIGNIN CARD
           ================================================= */}
 
           <section>
             {/* Mobile logo */}
             <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
+              initial={{
+                opacity: 0,
+                y: -10,
+              }}
+              animate={{
+                opacity: 1,
+                y: 0,
+              }}
+              transition={{
+                duration: 0.5,
+              }}
               className="mb-8 flex items-center justify-center gap-3 lg:hidden"
             >
               <div className="flex h-11 w-11 items-center justify-center">
@@ -481,7 +557,6 @@ export default function SigninPage() {
               <div className="pointer-events-none absolute -right-24 -top-24 h-56 w-56 rounded-full bg-[#625DF5]/15 blur-[80px]" />
 
               <div className="relative">
-                {/* Heading */}
                 <div className="mb-8">
                   <p className="mb-3 text-xs font-medium uppercase tracking-[0.2em] text-white/30">
                     Welcome back
@@ -500,10 +575,10 @@ export default function SigninPage() {
                   </p>
                 </div>
 
-                {/* Form */}
                 <form
                   onSubmit={handleSubmit}
                   className="space-y-5"
+                  noValidate
                 >
                   {/* Email */}
                   <div>
@@ -518,49 +593,80 @@ export default function SigninPage() {
                       id="username"
                       type="email"
                       value={username}
-                      onChange={(e) =>
-                        setUsername(e.target.value)
-                      }
+                      onChange={(e) => {
+                        setUsername(e.target.value);
+                        clearFieldError("username");
+                      }}
                       placeholder="you@example.com"
-                      required
                       autoComplete="email"
-                      className="h-12 w-full rounded-xl border border-white/[0.10] bg-black/20 px-4 text-sm text-white outline-none transition-all placeholder:text-white/25 hover:border-white/[0.18] focus:border-[#817CFF] focus:bg-black/25 focus:ring-4 focus:ring-[#625DF5]/10"
+                      className={`h-12 w-full rounded-xl border bg-black/20 px-4 text-sm text-white outline-none transition-all placeholder:text-white/25 hover:border-white/[0.18] focus:bg-black/25 focus:ring-4 ${
+                        fieldErrors.username
+                          ? "border-red-400/60 focus:border-red-400 focus:ring-red-400/10"
+                          : "border-white/[0.10] focus:border-[#817CFF] focus:ring-[#625DF5]/10"
+                      }`}
                     />
+
+                    {fieldErrors.username && (
+                      <motion.p
+                        initial={{
+                          opacity: 0,
+                          y: -4,
+                        }}
+                        animate={{
+                          opacity: 1,
+                          y: 0,
+                        }}
+                        className="mt-2 text-xs text-red-300"
+                      >
+                        {fieldErrors.username}
+                      </motion.p>
+                    )}
                   </div>
 
                   {/* Password */}
                   <div>
-                    <div className="mb-2 flex items-center justify-between">
-                      <label
-                        htmlFor="password"
-                        className="text-sm font-medium text-white/70"
-                      >
-                        Password
-                      </label>
-
-                      <button
-                        type="button"
-                        className="text-xs text-white/30 transition hover:text-[#A9A5FF]"
-                      >
-                        Forgot password?
-                      </button>
-                    </div>
+                    <label
+                      htmlFor="password"
+                      className="mb-2 block text-sm font-medium text-white/70"
+                    >
+                      Password
+                    </label>
 
                     <input
                       id="password"
                       type="password"
                       value={password}
-                      onChange={(e) =>
-                        setPassword(e.target.value)
-                      }
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        clearFieldError("password");
+                      }}
                       placeholder="••••••••"
-                      required
                       autoComplete="current-password"
-                      className="h-12 w-full rounded-xl border border-white/[0.10] bg-black/20 px-4 text-sm text-white outline-none transition-all placeholder:text-white/25 hover:border-white/[0.18] focus:border-[#817CFF] focus:bg-black/25 focus:ring-4 focus:ring-[#625DF5]/10"
+                      className={`h-12 w-full rounded-xl border bg-black/20 px-4 text-sm text-white outline-none transition-all placeholder:text-white/25 hover:border-white/[0.18] focus:bg-black/25 focus:ring-4 ${
+                        fieldErrors.password
+                          ? "border-red-400/60 focus:border-red-400 focus:ring-red-400/10"
+                          : "border-white/[0.10] focus:border-[#817CFF] focus:ring-[#625DF5]/10"
+                      }`}
                     />
+
+                    {fieldErrors.password && (
+                      <motion.p
+                        initial={{
+                          opacity: 0,
+                          y: -4,
+                        }}
+                        animate={{
+                          opacity: 1,
+                          y: 0,
+                        }}
+                        className="mt-2 text-xs text-red-300"
+                      >
+                        {fieldErrors.password}
+                      </motion.p>
+                    )}
                   </div>
 
-                  {/* Error */}
+                  {/* API error */}
                   {error && (
                     <motion.div
                       initial={{
@@ -579,8 +685,12 @@ export default function SigninPage() {
 
                   {/* Sign in */}
                   <motion.div
-                    whileHover={{ y: -2 }}
-                    whileTap={{ scale: 0.985 }}
+                    whileHover={{
+                      y: -2,
+                    }}
+                    whileTap={{
+                      scale: 0.985,
+                    }}
                   >
                     <Button
                       type="submit"
@@ -596,6 +706,7 @@ export default function SigninPage() {
                       ) : (
                         <span className="flex items-center justify-center gap-2">
                           Sign in
+
                           <span className="text-lg transition-transform duration-200 group-hover:translate-x-1">
                             →
                           </span>
