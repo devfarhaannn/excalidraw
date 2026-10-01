@@ -28,6 +28,12 @@ type IconProps = {
     className?: string;
 };
 
+type BoardType = {
+    id: "blank" | "flowchart" | "mindmap" | "wireframe";
+    title: string;
+    description: string;
+};
+
 
 function IconGrid({ className }: IconProps) {
     return (
@@ -356,6 +362,29 @@ const boards: Board[] = [
     },
 ];
 
+const boardTypes: BoardType[] = [
+    {
+        id: "blank",
+        title: "Blank Whiteboard",
+        description: "Start with a completely empty canvas.",
+    },
+    {
+        id: "flowchart",
+        title: "Flowchart",
+        description: "Map processes, systems and workflows.",
+    },
+    {
+        id: "mindmap",
+        title: "Mind Map",
+        description: "Organize ideas around a central concept.",
+    },
+    {
+        id: "wireframe",
+        title: "Wireframe",
+        description: "Sketch interfaces and product layouts.",
+    },
+];
+
 
 const navigation: {
     label: string;
@@ -391,6 +420,10 @@ export default function DashboardPage() {
     const [pageKey, setPageKey] = useState(0);
     const searchInputRef = useRef<HTMLInputElement>(null);
 
+    const [createModalOpen, setCreateModalOpen] = useState(false);
+    const [selectedBoardType, setSelectedBoardType] =
+        useState<BoardType["id"]>("blank");
+    const [boardTitle, setBoardTitle] = useState("");
 
 
     useEffect(() => {
@@ -433,6 +466,18 @@ export default function DashboardPage() {
     }, [activeTab, search]);
 
     useEffect(() => {
+        if (createModalOpen) {
+            document.body.style.overflow = "hidden";
+        } else {
+            document.body.style.overflow = "";
+        }
+
+        return () => {
+            document.body.style.overflow = "";
+        };
+    }, [createModalOpen]);
+
+    useEffect(() => {
         function handleShortcut(event: KeyboardEvent) {
             const isCommandOrControl =
                 event.metaKey || event.ctrlKey;
@@ -470,7 +515,12 @@ export default function DashboardPage() {
     function handleCreateBoard() {
         // Temporary.
         // This will later call POST /room.
-        console.log("Create board");
+        setCreateModalOpen(true);
+    }
+    function closeCreateModal() {
+        setCreateModalOpen(false);
+        setSelectedBoardType("blank");
+        setBoardTitle("");
     }
 
 
@@ -499,6 +549,24 @@ export default function DashboardPage() {
                 <div className="dashboard-glow-line dashboard-glow-line-one" />
                 <div className="dashboard-glow-line dashboard-glow-line-two" />
             </div>
+
+            {createModalOpen && (
+                <CreateBoardModal
+                    selectedBoardType={selectedBoardType}
+                    boardTitle={boardTitle}
+                    onBoardTypeChange={setSelectedBoardType}
+                    onBoardTitleChange={setBoardTitle}
+                    onClose={closeCreateModal}
+                    onCreate={() => {
+                        console.log({
+                            title: boardTitle,
+                            type: selectedBoardType,
+                        });
+
+                        closeCreateModal();
+                    }}
+                />
+            )}
 
 
 
@@ -1434,4 +1502,321 @@ function InfoLine({
             <span className="text-sm font-medium">{value}</span>
         </div>
     );
+}
+
+
+function CreateBoardModal({
+    selectedBoardType,
+    boardTitle,
+    onBoardTypeChange,
+    onBoardTitleChange,
+    onClose,
+    onCreate,
+}: {
+    selectedBoardType: BoardType["id"];
+    boardTitle: string;
+    onBoardTypeChange: (value: BoardType["id"]) => void;
+    onBoardTitleChange: (value: string) => void;
+    onClose: () => void;
+    onCreate: () => void;
+}) {
+    const selectedType = boardTypes.find(
+        (type) => type.id === selectedBoardType
+    );
+
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            {/* Overlay */}
+            <button
+                type="button"
+                aria-label="Close create board dialog"
+                onClick={onClose}
+                className="absolute inset-0 bg-black/20 backdrop-blur-[3px]"
+            />
+
+            {/* Modal */}
+            <div className="relative z-10 w-full max-w-[620px] overflow-hidden rounded-[24px] border border-black/[0.08] bg-white shadow-[0_30px_90px_rgba(20,20,30,.18)]">
+                {/* Header */}
+                <div className="flex items-start justify-between border-b border-black/[0.06] px-6 py-5 sm:px-7">
+                    <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#625DF5]">
+                            New workspace
+                        </p>
+
+                        <h2 className="mt-1.5 text-xl font-semibold tracking-[-0.025em] text-[#1d1d22]">
+                            Create a new board
+                        </h2>
+
+                        <p className="mt-1 text-xs text-[#90909a]">
+                            Choose how you'd like to start your canvas.
+                        </p>
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="flex h-9 w-9 items-center justify-center rounded-lg text-[#8d8d96] transition-colors hover:bg-black/[0.04] hover:text-[#33333a]"
+                    >
+                        <IconClose className="h-4 w-4" />
+                    </button>
+                </div>
+
+                {/* Body */}
+                <div className="px-6 py-6 sm:px-7">
+                    <p className="mb-3 text-xs font-medium text-[#55555f]">
+                        Choose a board type
+                    </p>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                        {boardTypes.map((type) => {
+                            const active = selectedBoardType === type.id;
+
+                            return (
+                                <button
+                                    key={type.id}
+                                    type="button"
+                                    onClick={() => onBoardTypeChange(type.id)}
+                                    className={[
+                                        "group relative rounded-2xl border p-4 text-left transition-all duration-200",
+                                        active
+                                            ? "border-[#625DF5]/40 bg-[#625DF5]/[0.05] shadow-[0_8px_24px_rgba(98,93,245,.08)]"
+                                            : "border-black/[0.07] bg-[#fafafa] hover:-translate-y-0.5 hover:border-black/[0.12] hover:bg-white",
+                                    ].join(" ")}
+                                >
+                                    <div className="flex items-start gap-3">
+                                        <BoardTypeIcon
+                                            type={type.id}
+                                            active={active}
+                                        />
+
+                                        <div className="min-w-0">
+                                            <p
+                                                className={[
+                                                    "text-sm font-semibold",
+                                                    active
+                                                        ? "text-[#514cf0]"
+                                                        : "text-[#303038]",
+                                                ].join(" ")}
+                                            >
+                                                {type.title}
+                                            </p>
+
+                                            <p className="mt-1 text-[11px] leading-5 text-[#96969f]">
+                                                {type.description}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {active && (
+                                        <span className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-[#625DF5] text-white">
+                                            <svg
+                                                viewBox="0 0 24 24"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                strokeWidth="2.5"
+                                                className="h-3 w-3"
+                                            >
+                                                <path
+                                                    d="m5 12 4 4L19 6"
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                />
+                                            </svg>
+                                        </span>
+                                    )}
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    {/* Title */}
+                    <div className="mt-6">
+                        <label
+                            htmlFor="board-title"
+                            className="mb-2 block text-xs font-medium text-[#55555f]"
+                        >
+                            Board title
+                        </label>
+
+                        <input
+                            id="board-title"
+                            value={boardTitle}
+                            onChange={(event) =>
+                                onBoardTitleChange(event.target.value)
+                            }
+                            onKeyDown={(event) => {
+                                if (
+                                    event.key === "Enter" &&
+                                    boardTitle.trim()
+                                ) {
+                                    onCreate();
+                                }
+                            }}
+                            autoFocus
+                            maxLength={50}
+                            placeholder={
+                                selectedType
+                                    ? `e.g. ${getBoardTitleExample(selectedType.id)}`
+                                    : "Enter board title"
+                            }
+                            className="h-11 w-full rounded-xl border border-black/[0.08] bg-[#fafafd] px-3.5 text-sm text-[#202027] outline-none transition-all placeholder:text-[#aaaab2] focus:border-[#625DF5]/40 focus:bg-white focus:shadow-[0_4px_16px_rgba(98,93,245,.07)]"
+                        />
+
+                        <div className="mt-2 flex items-center justify-between">
+                            <p className="text-[10px] text-[#a0a0a8]">
+                                Give your board a name you'll recognize later.
+                            </p>
+
+                            <span className="text-[10px] text-[#aaaab2]">
+                                {boardTitle.length}/50
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Footer */}
+                <div className="flex items-center justify-end gap-2 border-t border-black/[0.06] bg-[#fafafa] px-6 py-4 sm:px-7">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="h-10 rounded-lg px-4 text-sm font-medium text-[#777783] transition-colors hover:bg-black/[0.04] hover:text-[#33333a]"
+                    >
+                        Cancel
+                    </button>
+
+                    <button
+                        type="button"
+                        disabled={!boardTitle.trim()}
+                        onClick={onCreate}
+                        className="flex h-10 items-center gap-2 rounded-lg bg-[#17171b] px-4 text-sm font-medium text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#28282d] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:translate-y-0"
+                    >
+                        <IconPlus className="h-4 w-4" />
+                        Create board
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function BoardTypeIcon({
+    type,
+    active,
+}: {
+    type: BoardType["id"];
+    active: boolean;
+}) {
+    const color = active ? "#625DF5" : "#777783";
+
+    if (type === "blank") {
+        return (
+            <div
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+                style={{
+                    backgroundColor: active
+                        ? "rgba(98,93,245,.10)"
+                        : "#f1f1f3",
+                    color,
+                }}
+            >
+                <IconGrid className="h-5 w-5" />
+            </div>
+        );
+    }
+
+    if (type === "flowchart") {
+        return (
+            <div
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+                style={{
+                    backgroundColor: active
+                        ? "rgba(98,93,245,.10)"
+                        : "#f1f1f3",
+                    color,
+                }}
+            >
+                <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    className="h-5 w-5"
+                >
+                    <rect x="7" y="3" width="10" height="5" rx="1" />
+                    <rect x="3" y="16" width="7" height="5" rx="1" />
+                    <rect x="14" y="16" width="7" height="5" rx="1" />
+                    <path d="M12 8v4M12 12H6.5v4M12 12h5.5v4" />
+                </svg>
+            </div>
+        );
+    }
+
+    if (type === "mindmap") {
+        return (
+            <div
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+                style={{
+                    backgroundColor: active
+                        ? "rgba(98,93,245,.10)"
+                        : "#f1f1f3",
+                    color,
+                }}
+            >
+                <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    className="h-5 w-5"
+                >
+                    <circle cx="12" cy="12" r="3" />
+                    <circle cx="5" cy="6" r="2" />
+                    <circle cx="19" cy="6" r="2" />
+                    <circle cx="5" cy="18" r="2" />
+                    <circle cx="19" cy="18" r="2" />
+                    <path d="m10 10-3-3M14 10l3-3M10 14l-3 3M14 14l3 3" />
+                </svg>
+            </div>
+        );
+    }
+
+    return (
+        <div
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+            style={{
+                backgroundColor: active
+                    ? "rgba(98,93,245,.10)"
+                    : "#f1f1f3",
+                color,
+            }}
+        >
+            <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                className="h-5 w-5"
+            >
+                <rect x="4" y="3" width="16" height="18" rx="2" />
+                <path d="M8 8h8M8 12h5M8 16h8" />
+            </svg>
+        </div>
+    );
+}
+
+function getBoardTitleExample(type: BoardType["id"]) {
+    switch (type) {
+        case "flowchart":
+            return "E-commerce User Flow";
+
+        case "mindmap":
+            return "My Project Ideas";
+
+        case "wireframe":
+            return "Draivo Dashboard";
+
+        case "blank":
+        default:
+            return "My New Board";
+    }
 }
