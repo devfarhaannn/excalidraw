@@ -201,27 +201,90 @@ export default function RoomPage() {
     }, []);
 
     useEffect(() => {
-        function handleKeyDown(
-            event: KeyboardEvent
-        ) {
-            if (event.key === "Escape") {
-                setMenuOpen(false);
-                setMenuSearchOpen(false);
-            }
+    function handleKeyDown(event: KeyboardEvent) {
+        /*
+         * Don't trigger shortcuts while typing.
+         */
+        const target =
+            event.target as HTMLElement | null;
+
+        const isTyping =
+            target?.tagName === "INPUT" ||
+            target?.tagName === "TEXTAREA" ||
+            target?.tagName === "SELECT" ||
+            target?.isContentEditable;
+
+        if (isTyping) {
+            return;
         }
 
-        window.addEventListener(
+        /*
+         * Escape
+         */
+        if (event.key === "Escape") {
+            setMenuOpen(false);
+            setMenuSearchOpen(false);
+            return;
+        }
+
+        /*
+         * Tool shortcuts
+         */
+        switch (event.key.toLowerCase()) {
+            case "v":
+                setActiveTool("select");
+                break;
+
+            case "r":
+                setActiveTool("rectangle");
+                break;
+
+            case "d":
+                setActiveTool("diamond");
+                break;
+
+            case "o":
+                setActiveTool("ellipse");
+                break;
+
+            case "a":
+                setActiveTool("arrow");
+                break;
+
+            case "l":
+                setActiveTool("line");
+                break;
+
+            case "p":
+                setActiveTool("draw");
+                break;
+
+            case "t":
+                setActiveTool("text");
+                break;
+
+            case "n":
+                setActiveTool("note");
+                break;
+
+            case "e":
+                setActiveTool("eraser");
+                break;
+        }
+    }
+
+    window.addEventListener(
+        "keydown",
+        handleKeyDown
+    );
+
+    return () => {
+        window.removeEventListener(
             "keydown",
             handleKeyDown
         );
-
-        return () => {
-            window.removeEventListener(
-                "keydown",
-                handleKeyDown
-            );
-        };
-    }, []);
+    };
+}, []);
 
     function zoomIn() {
         setZoom((value) =>
