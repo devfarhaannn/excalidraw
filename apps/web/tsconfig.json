@@ -17,6 +17,6 @@
     "next-env.d.ts",
     "next.config.js",
     ".next/types/**/*.ts"
-  ],
+, "app/room/[slug]/components/WhiteboardToolbar.tsx "  ],
   "exclude": ["node_modules"]
 }

@@ -11,6 +11,8 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 
+import Link from "next/link";
+
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 
 type Accent = "purple" | "orange" | "green";
@@ -1590,13 +1592,13 @@ function BoardCard({ board, onToggleStar }: { board: Board, onToggleStar: (board
                         {board.collaborators} collaborators
                     </span>
 
-                    <button
-                        type="button"
+                    <Link
+                        href={`/room/${encodeURIComponent(board.name)}`}
                         className="flex items-center gap-1 text-[11px] font-medium text-[#625DF5] opacity-0 transition-all duration-200 group-hover:translate-x-0.5 group-hover:opacity-100"
                     >
                         Open
                         <IconArrowUpRight className="h-3 w-3" />
-                    </button>
+                    </Link>
                 </div>
             </div>
         </article>
