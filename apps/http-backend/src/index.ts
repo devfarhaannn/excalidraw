@@ -11,7 +11,6 @@ import cors from "cors"
 import bcrypt from "bcrypt"
 
 
-console.log("DATABASE_URL:", process.env.DATABASE_URL)
 const app = express()
 const SALT_ROUND = 10
 app.use(cors());
@@ -104,14 +103,12 @@ app.post("/signin", async (req, res) => {
     }
 })
 app.post("/room", middleware, async (req, res) => {
-    const start = Date.now();
-
     const { success, data } = CreateRoomSchema.safeParse(req.body);
 
     if (!success) {
         return res.status(400).json({
             success: false,
-            error: "Incorrects roomName",
+            error: "Incorrect room name",
         });
     }
 
@@ -125,16 +122,12 @@ app.post("/room", middleware, async (req, res) => {
     }
 
     try {
-        console.log("Before Prisma:", Date.now() - start, "ms");
-
         const room = await prisma.room.create({
             data: {
                 slug: data.name,
                 adminId: userId,
             },
         });
-
-        console.log("After Prisma:", Date.now() - start, "ms");
 
         return res.status(201).json({
             success: true,
