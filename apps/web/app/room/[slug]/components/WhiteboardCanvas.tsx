@@ -1,5 +1,8 @@
 "use client";
 
+import { useRef } from "react";
+
+import { useCanvasPan } from "../hooks/useCanvasPan";
 import type { ToolId } from "../types/whiteboard";
 
 type WhiteboardCanvasProps = {
@@ -12,14 +15,27 @@ type WhiteboardCanvasProps = {
 
 export default function WhiteboardCanvas({
     background,
+    activeTool,
 }: WhiteboardCanvasProps) {
+    const containerRef =
+        useRef<HTMLDivElement | null>(null);
+
+    const {
+        cursor,
+    } = useCanvasPan({
+        containerRef,
+        activeTool,
+    });
+
     return (
         <div
+            ref={containerRef}
             className="fixed inset-0 overflow-hidden select-none"
             style={{
                 backgroundColor: background,
-                overscrollBehavior: "none",
+                cursor,
                 touchAction: "none",
+                overscrollBehavior: "none",
             }}
         />
     );
