@@ -7,6 +7,11 @@ import {
 } from "react";
 
 import {
+    Redo2,
+    Undo2,
+} from "lucide-react";
+
+import {
     useCanvasDrawing,
     type TextEditingTarget,
 } from "../hooks/useCanvasDrawing";
@@ -61,18 +66,24 @@ export default function WhiteboardCanvas({
             null
         );
 
-
-
     const {
         elements,
         selectedId,
+
         addElement,
         updateElement,
         deleteElement,
         selectElement,
+
+        beginHistory,
+        commitHistory,
+
+        undo,
+        redo,
+
+        canUndo,
+        canRedo,
     } = useWhiteboard();
-
-
 
     const [
         textEditor,
@@ -120,6 +131,9 @@ export default function WhiteboardCanvas({
 
         /*
          * New text
+         *
+         * addElement() automatically records
+         * the previous state.
          */
         if (
             textEditor.elementId === null
@@ -146,8 +160,14 @@ export default function WhiteboardCanvas({
 
         /*
          * Edit existing text
+         *
+         * Save the state before modifying it
+         * so Undo can restore the old text.
          */
         else {
+            const beforeElements =
+                beginHistory();
+
             updateElement(
                 textEditor.elementId,
                 (current) => {
@@ -166,6 +186,10 @@ export default function WhiteboardCanvas({
                     };
                 }
             );
+
+            commitHistory(
+                beforeElements
+            );
         }
 
         setTextEditor(null);
@@ -174,7 +198,6 @@ export default function WhiteboardCanvas({
     function cancelTextEditing() {
         setTextEditor(null);
     }
-
 
 
     const {
@@ -197,7 +220,6 @@ export default function WhiteboardCanvas({
     });
 
 
-
     const {
         handlePointerDown,
         handlePointerMove,
@@ -208,15 +230,115 @@ export default function WhiteboardCanvas({
         zoom,
         pan,
         elements,
+
         addElement,
         updateElement,
         deleteElement,
         selectElement,
+
+        beginHistory,
+        commitHistory,
+
         spacePressed,
+
         onStartTextEditing:
             startTextEditing,
     });
 
+    /*
+     * ------------------------------------------
+     * UNDO / REDO KEYBOARD SHORTCUTS
+     * ------------------------------------------
+     *
+     * Mac:
+     * Cmd + Z       → Undo
+     * Cmd + Shift Z → Redo
+     *
+     * Windows/Linux:
+     * Ctrl + Z       → Undo
+     * Ctrl + Shift Z → Redo
+     * Ctrl + Y       → Redo
+     */
+    useEffect(() => {
+        function handleKeyDown(
+            event: KeyboardEvent
+        ) {
+            const target =
+                event.target as HTMLElement | null;
+
+            const typing =
+                target?.tagName === "INPUT" ||
+                target?.tagName === "TEXTAREA" ||
+                target?.tagName === "SELECT" ||
+                target?.isContentEditable;
+
+            /*
+             * Don't intercept shortcuts while
+             * typing into an input/editor.
+             */
+            if (typing) {
+                return;
+            }
+
+            const modifier =
+                event.metaKey ||
+                event.ctrlKey;
+
+            /*
+             * Undo
+             */
+            if (
+                modifier &&
+                event.key.toLowerCase() === "z" &&
+                !event.shiftKey
+            ) {
+                event.preventDefault();
+                undo();
+                return;
+            }
+
+            /*
+             * Redo:
+             * Cmd/Ctrl + Shift + Z
+             */
+            if (
+                modifier &&
+                event.key.toLowerCase() === "z" &&
+                event.shiftKey
+            ) {
+                event.preventDefault();
+                redo();
+                return;
+            }
+
+            /*
+             * Windows/Linux:
+             * Ctrl + Y
+             */
+            if (
+                event.ctrlKey &&
+                event.key.toLowerCase() === "y"
+            ) {
+                event.preventDefault();
+                redo();
+            }
+        }
+
+        window.addEventListener(
+            "keydown",
+            handleKeyDown
+        );
+
+        return () => {
+            window.removeEventListener(
+                "keydown",
+                handleKeyDown
+            );
+        };
+    }, [
+        undo,
+        redo,
+    ]);
 
 
     useEffect(() => {
@@ -249,7 +371,6 @@ export default function WhiteboardCanvas({
         background,
         dark,
     ]);
-
 
 
     useEffect(() => {
@@ -304,7 +425,6 @@ export default function WhiteboardCanvas({
                       selectedId
               );
 
-
     return (
         <div
             ref={containerRef}
@@ -330,10 +450,59 @@ export default function WhiteboardCanvas({
                 event.preventDefault();
             }}
         >
+
             <canvas
                 ref={canvasRef}
                 className="absolute inset-0 block h-full w-full"
             />
+
+
+            <div
+                className={[
+                    "absolute bottom-4 left-4 z-40 flex items-center rounded-xl border p-1 shadow-[0_8px_30px_rgba(20,20,30,.08)] backdrop-blur-xl",
+                    dark
+                        ? "border-white/10 bg-[#242429]/95"
+                        : "border-black/[0.07] bg-white/[0.96]",
+                ].join(" ")}
+            >
+                <button
+                    type="button"
+                    title="Undo"
+                    disabled={!canUndo}
+                    onClick={undo}
+                    className={[
+                        "flex h-8 w-8 items-center justify-center rounded-lg transition-colors",
+                        !canUndo
+                            ? dark
+                                ? "cursor-not-allowed text-white/20"
+                                : "cursor-not-allowed text-[#c6c6cc]"
+                            : dark
+                                ? "text-white/55 hover:bg-white/[0.07] hover:text-white"
+                                : "text-[#696973] hover:bg-[#f5f4fa]",
+                    ].join(" ")}
+                >
+                    <Undo2 className="h-4 w-4" />
+                </button>
+
+                <button
+                    type="button"
+                    title="Redo"
+                    disabled={!canRedo}
+                    onClick={redo}
+                    className={[
+                        "flex h-8 w-8 items-center justify-center rounded-lg transition-colors",
+                        !canRedo
+                            ? dark
+                                ? "cursor-not-allowed text-white/20"
+                                : "cursor-not-allowed text-[#c6c6cc]"
+                            : dark
+                                ? "text-white/55 hover:bg-white/[0.07] hover:text-white"
+                                : "text-[#696973] hover:bg-[#f5f4fa]",
+                    ].join(" ")}
+                >
+                    <Redo2 className="h-4 w-4" />
+                </button>
+            </div>
 
             {selectedElement && (
                 <SelectionOverlay
@@ -348,8 +517,15 @@ export default function WhiteboardCanvas({
                     updateElement={
                         updateElement
                     }
+                    beginHistory={
+                        beginHistory
+                    }
+                    commitHistory={
+                        commitHistory
+                    }
                 />
             )}
+
 
             {textEditor && (
                 <TextEditorOverlay

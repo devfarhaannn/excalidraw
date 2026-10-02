@@ -18,6 +18,7 @@ type Pan = {
     x: number;
     y: number;
 };
+
 export type TextEditingTarget = {
     x: number;
     y: number;
@@ -52,7 +53,14 @@ type UseCanvasDrawingProps = {
         id: number | null
     ) => void;
 
+    beginHistory: () => CanvasElement[];
+
+    commitHistory: (
+        beforeElements: CanvasElement[]
+    ) => void;
+
     spacePressed: boolean;
+
     onStartTextEditing: (
         target: TextEditingTarget
     ) => void;
@@ -65,12 +73,13 @@ type DrawingState =
     | {
         active: true;
         mode:
-        | "draw"
-        | "move"
-        | "erase";
+            | "draw"
+            | "move"
+            | "erase";
         elementId: number;
         tool: ToolId;
         lastWorld: Point;
+        beforeElements: CanvasElement[];
     };
 
 export function useCanvasDrawing({
@@ -83,15 +92,15 @@ export function useCanvasDrawing({
     updateElement,
     deleteElement,
     selectElement,
+    beginHistory,
+    commitHistory,
     spacePressed,
-    onStartTextEditing
+    onStartTextEditing,
 }: UseCanvasDrawingProps) {
     const drawingRef =
         useRef<DrawingState>({
             active: false,
         });
-
-
 
     function screenToWorld(
         clientX: number,
@@ -110,7 +119,8 @@ export function useCanvasDrawing({
         const rect =
             container.getBoundingClientRect();
 
-        const scale = zoom / 100;
+        const scale =
+            zoom / 100;
 
         return {
             x:
@@ -129,7 +139,6 @@ export function useCanvasDrawing({
         };
     }
 
-
     function createId() {
         return (
             Date.now() +
@@ -138,8 +147,6 @@ export function useCanvasDrawing({
             )
         );
     }
-
-
 
     function isShapeTool(
         tool: ToolId
@@ -158,13 +165,11 @@ export function useCanvasDrawing({
         );
     }
 
-
     function handlePointerDown(
         event: ReactPointerEvent<HTMLDivElement>
     ) {
         /*
-         * Middle mouse and right mouse are not
-         * drawing actions.
+         * Only left mouse button draws/selects.
          */
         if (event.button !== 0) {
             return;
@@ -194,6 +199,7 @@ export function useCanvasDrawing({
                 event.clientY
             );
 
+
         if (
             activeTool === "select"
         ) {
@@ -203,11 +209,17 @@ export function useCanvasDrawing({
                     elements
                 );
 
+            /*
+             * Empty canvas.
+             */
             if (!selected) {
                 selectElement(null);
                 return;
             }
 
+            /*
+             * Select object.
+             */
             selectElement(
                 selected.id
             );
@@ -225,7 +237,8 @@ export function useCanvasDrawing({
                     y: selected.y,
                     text: selected.text,
                     fontSize:
-                        selected.fontSize ?? 20,
+                        selected.fontSize ??
+                        20,
                     elementId:
                         selected.id,
                 });
@@ -233,6 +246,15 @@ export function useCanvasDrawing({
                 return;
             }
 
+            /*
+             * Begin moving selected object.
+             *
+             * We capture the complete state BEFORE
+             * the movement begins. This lets Undo
+             * restore the object in one operation
+             * instead of creating history entries
+             * for every pointer movement.
+             */
             event.currentTarget.setPointerCapture(
                 event.pointerId
             );
@@ -244,6 +266,8 @@ export function useCanvasDrawing({
                     selected.id,
                 tool: "select",
                 lastWorld: world,
+                beforeElements:
+                    beginHistory(),
             };
 
             return;
@@ -265,6 +289,9 @@ export function useCanvasDrawing({
 
             /*
              * Delete immediately.
+             *
+             * deleteElement() already records
+             * the previous state in history.
              */
             deleteElement(
                 selected.id
@@ -284,6 +311,7 @@ export function useCanvasDrawing({
                     selected.id,
                 tool: "eraser",
                 lastWorld: world,
+                beforeElements: [],
             };
 
             return;
@@ -334,11 +362,11 @@ export function useCanvasDrawing({
         }
 
 
-
         if (
             activeTool === "draw"
         ) {
-            const id = createId();
+            const id =
+                createId();
 
             addElement({
                 id,
@@ -352,6 +380,7 @@ export function useCanvasDrawing({
                 elementId: id,
                 tool: "draw",
                 lastWorld: world,
+                beforeElements: [],
             };
 
             event.currentTarget.setPointerCapture(
@@ -362,11 +391,11 @@ export function useCanvasDrawing({
         }
 
 
-
         if (
             isShapeTool(activeTool)
         ) {
-            const id = createId();
+            const id =
+                createId();
 
             addElement({
                 id,
@@ -383,6 +412,7 @@ export function useCanvasDrawing({
                 elementId: id,
                 tool: activeTool,
                 lastWorld: world,
+                beforeElements: [],
             };
 
             event.currentTarget.setPointerCapture(
@@ -390,7 +420,6 @@ export function useCanvasDrawing({
             );
         }
     }
-
 
     function handlePointerMove(
         event: ReactPointerEvent<HTMLDivElement>
@@ -431,7 +460,7 @@ export function useCanvasDrawing({
                 drawing.elementId,
                 (element) => {
                     switch (
-                    element.type
+                        element.type
                     ) {
                         case "rectangle":
                         case "diamond":
@@ -506,6 +535,7 @@ export function useCanvasDrawing({
             return;
         }
 
+
         if (
             drawing.mode === "erase"
         ) {
@@ -557,7 +587,11 @@ export function useCanvasDrawing({
             return;
         }
 
-
+        /*
+         * ------------------------------------------
+         * SHAPE DRAWING
+         * ------------------------------------------
+         */
         if (
             isShapeTool(
                 drawing.tool
@@ -567,7 +601,7 @@ export function useCanvasDrawing({
                 drawing.elementId,
                 (element) => {
                     switch (
-                    element.type
+                        element.type
                     ) {
                         case "rectangle":
                         case "diamond":
@@ -591,8 +625,6 @@ export function useCanvasDrawing({
         }
     }
 
-
-
     function handlePointerUp(
         event: ReactPointerEvent<HTMLDivElement>
     ) {
@@ -603,6 +635,9 @@ export function useCanvasDrawing({
             return;
         }
 
+        /*
+         * Release pointer capture.
+         */
         if (
             event.currentTarget.hasPointerCapture(
                 event.pointerId
@@ -610,6 +645,19 @@ export function useCanvasDrawing({
         ) {
             event.currentTarget.releasePointerCapture(
                 event.pointerId
+            );
+        }
+
+        /*
+         * Record a single history entry
+         * for the entire move operation.
+         */
+        if (
+            drawing.mode === "move" &&
+            drawing.beforeElements.length > 0
+        ) {
+            commitHistory(
+                drawing.beforeElements
             );
         }
 

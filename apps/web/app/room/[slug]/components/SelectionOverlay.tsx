@@ -26,11 +26,18 @@ type SelectionOverlayProps = {
     element: CanvasElement;
     zoom: number;
     pan: Pan;
+
     updateElement: (
         id: number,
         update: (
             element: CanvasElement
         ) => CanvasElement
+    ) => void;
+
+    beginHistory: () => CanvasElement[];
+
+    commitHistory: (
+        beforeElements: CanvasElement[]
     ) => void;
 };
 
@@ -40,224 +47,6 @@ type Bounds = {
     maxX: number;
     maxY: number;
 };
-
-export default function SelectionOverlay({
-    containerRef,
-    element,
-    zoom,
-    pan,
-    updateElement,
-}: SelectionOverlayProps) {
-    const [
-        viewport,
-        setViewport,
-    ] = useState({
-        width: 0,
-        height: 0,
-    });
-
-    const {
-        handlePointerDown,
-        handlePointerMove,
-        handlePointerUp,
-    } = useSelectionResize({
-        containerRef,
-        element,
-        zoom,
-        pan,
-        updateElement,
-    });
-
-    useEffect(() => {
-        function updateViewport() {
-            const container =
-                containerRef.current;
-
-            if (!container) {
-                return;
-            }
-
-            const rect =
-                container.getBoundingClientRect();
-
-            setViewport({
-                width: rect.width,
-                height: rect.height,
-            });
-        }
-
-        updateViewport();
-
-        window.addEventListener(
-            "resize",
-            updateViewport
-        );
-
-        return () => {
-            window.removeEventListener(
-                "resize",
-                updateViewport
-            );
-        };
-    }, [containerRef]);
-
-    const bounds =
-        getElementBounds(element);
-
-    const scale = zoom / 100;
-
-    const padding = 6;
-
-    const left =
-        viewport.width / 2 +
-        pan.x +
-        bounds.minX * scale -
-        padding;
-
-    const top =
-        viewport.height / 2 +
-        pan.y +
-        bounds.minY * scale -
-        padding;
-
-    const width =
-        (bounds.maxX -
-            bounds.minX) *
-            scale +
-        padding * 2;
-
-    const height =
-        (bounds.maxY -
-            bounds.minY) *
-            scale +
-        padding * 2;
-
-    if (
-        viewport.width === 0 ||
-        viewport.height === 0
-    ) {
-        return null;
-    }
-
-    return (
-        <div
-            className="pointer-events-none absolute z-20"
-            style={{
-                left,
-                top,
-                width: Math.max(
-                    width,
-                    12
-                ),
-                height: Math.max(
-                    height,
-                    12
-                ),
-            }}
-        >
-            <div className="absolute inset-0 rounded-[2px] border border-dashed border-[#625DF5]" />
-
-            <ResizeHandle
-                handle="nw"
-                className="-left-[4px] -top-[4px] cursor-nwse-resize"
-                onPointerDown={
-                    handlePointerDown
-                }
-                onPointerMove={
-                    handlePointerMove
-                }
-                onPointerUp={
-                    handlePointerUp
-                }
-            />
-
-            <ResizeHandle
-                handle="ne"
-                className="-right-[4px] -top-[4px] cursor-nesw-resize"
-                onPointerDown={
-                    handlePointerDown
-                }
-                onPointerMove={
-                    handlePointerMove
-                }
-                onPointerUp={
-                    handlePointerUp
-                }
-            />
-
-            <ResizeHandle
-                handle="sw"
-                className="-bottom-[4px] -left-[4px] cursor-nesw-resize"
-                onPointerDown={
-                    handlePointerDown
-                }
-                onPointerMove={
-                    handlePointerMove
-                }
-                onPointerUp={
-                    handlePointerUp
-                }
-            />
-
-            <ResizeHandle
-                handle="se"
-                className="-bottom-[4px] -right-[4px] cursor-nwse-resize"
-                onPointerDown={
-                    handlePointerDown
-                }
-                onPointerMove={
-                    handlePointerMove
-                }
-                onPointerUp={
-                    handlePointerUp
-                }
-            />
-        </div>
-    );
-}
-
-function ResizeHandle({
-    handle,
-    className,
-    onPointerDown,
-    onPointerMove,
-    onPointerUp,
-}: {
-    handle: Handle;
-    className: string;
-    onPointerDown: (
-        handle: Handle,
-        event: ReactPointerEvent<HTMLDivElement>
-    ) => void;
-    onPointerMove: (
-        event: ReactPointerEvent<HTMLDivElement>
-    ) => void;
-    onPointerUp: (
-        event: ReactPointerEvent<HTMLDivElement>
-    ) => void;
-}) {
-    return (
-        <div
-            data-handle={handle}
-            className={[
-                "pointer-events-auto absolute h-2.5 w-2.5 rounded-[2px] border border-white bg-[#625DF5] shadow-sm",
-                className,
-            ].join(" ")}
-            onPointerDown={(event) =>
-                onPointerDown(
-                    handle,
-                    event
-                )
-            }
-            onPointerMove={
-                onPointerMove
-            }
-            onPointerUp={
-                onPointerUp
-            }
-        />
-    );
-}
 
 function getElementBounds(
     element: CanvasElement
@@ -350,7 +139,7 @@ function getElementBounds(
             const fontSize =
                 element.fontSize ?? 20;
 
-            const textWidth =
+            const width =
                 Math.max(
                     element.text.length *
                         fontSize *
@@ -362,8 +151,7 @@ function getElementBounds(
                 minX: element.x,
                 minY: element.y,
                 maxX:
-                    element.x +
-                    textWidth,
+                    element.x + width,
                 maxY:
                     element.y +
                     fontSize * 1.2,
@@ -382,4 +170,166 @@ function getElementBounds(
                     element.height,
             };
     }
+}
+
+export default function SelectionOverlay({
+    containerRef,
+    element,
+    zoom,
+    pan,
+    updateElement,
+    beginHistory,
+    commitHistory,
+}: SelectionOverlayProps) {
+    const [
+        bounds,
+        setBounds,
+    ] = useState<Bounds>(() =>
+        getElementBounds(element)
+    );
+
+    useEffect(() => {
+        setBounds(
+            getElementBounds(element)
+        );
+    }, [element]);
+
+    const {
+        handlePointerDown,
+        handlePointerMove,
+        handlePointerUp,
+    } = useSelectionResize({
+        containerRef,
+        element,
+        zoom,
+        pan,
+        updateElement,
+        beginHistory,
+        commitHistory,
+    });
+
+    const scale = zoom / 100;
+
+    /*
+     * Convert world coordinates to
+     * screen coordinates.
+     */
+    const left =
+        `calc(50% + ${
+            pan.x +
+            bounds.minX * scale
+        }px)`;
+
+    const top =
+        `calc(50% + ${
+            pan.y +
+            bounds.minY * scale
+        }px)`;
+
+    const width =
+        Math.max(
+            (bounds.maxX -
+                bounds.minX) *
+                scale,
+            10
+        );
+
+    const height =
+        Math.max(
+            (bounds.maxY -
+                bounds.minY) *
+                scale,
+            10
+        );
+
+    const handleSize = 10;
+
+    const handles: {
+        id: Handle;
+        className: string;
+    }[] = [
+        {
+            id: "nw",
+            className:
+                "left-0 top-0 -translate-x-1/2 -translate-y-1/2 cursor-nwse-resize",
+        },
+        {
+            id: "ne",
+            className:
+                "right-0 top-0 translate-x-1/2 -translate-y-1/2 cursor-nesw-resize",
+        },
+        {
+            id: "sw",
+            className:
+                "bottom-0 left-0 -translate-x-1/2 translate-y-1/2 cursor-nesw-resize",
+        },
+        {
+            id: "se",
+            className:
+                "bottom-0 right-0 translate-x-1/2 translate-y-1/2 cursor-nwse-resize",
+        },
+    ];
+
+    return (
+        <div
+            className="pointer-events-none absolute z-30"
+            style={{
+                left,
+                top,
+                width,
+                height,
+            }}
+        >
+            {/* Selection border */}
+            <div className="absolute inset-0 rounded-[2px] border border-[#625DF5]" />
+
+            {/* Resize handles */}
+            {handles.map(
+                ({ id, className }) => (
+                    <div
+                        key={id}
+                        className={[
+                            "pointer-events-auto absolute rounded-[3px] border border-[#625DF5] bg-white shadow-sm",
+                            className,
+                        ].join(" ")}
+                        style={{
+                            width:
+                                handleSize,
+                            height:
+                                handleSize,
+                        }}
+                        onPointerDown={(
+                            event
+                        ) =>
+                            handlePointerDown(
+                                id,
+                                event as ReactPointerEvent<HTMLDivElement>
+                            )
+                        }
+                        onPointerMove={(
+                            event
+                        ) =>
+                            handlePointerMove(
+                                event as ReactPointerEvent<HTMLDivElement>
+                            )
+                        }
+                        onPointerUp={(
+                            event
+                        ) =>
+                            handlePointerUp(
+                                event as ReactPointerEvent<HTMLDivElement>
+                            )
+                        }
+                        onPointerCancel={(
+                            event
+                        ) =>
+                            handlePointerUp(
+                                event as ReactPointerEvent<HTMLDivElement>
+                            )
+                        }
+                    />
+                )
+            )}
+        </div>
+    );
 }

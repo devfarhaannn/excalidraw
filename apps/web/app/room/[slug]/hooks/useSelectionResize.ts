@@ -44,6 +44,12 @@ type UseSelectionResizeProps = {
             element: CanvasElement
         ) => CanvasElement
     ) => void;
+
+    beginHistory: () => CanvasElement[];
+
+    commitHistory: (
+        beforeElements: CanvasElement[]
+    ) => void;
 };
 
 type ResizeState = {
@@ -62,6 +68,8 @@ export function useSelectionResize({
     zoom,
     pan,
     updateElement,
+    beginHistory,
+    commitHistory,
 }: UseSelectionResizeProps) {
     const resizeRef =
         useRef<ResizeState>({
@@ -76,6 +84,18 @@ export function useSelectionResize({
                 maxY: 0,
             },
         });
+
+    /*
+     * Stores the canvas state before
+     * the resize operation begins.
+     *
+     * We commit this only once when the
+     * pointer is released.
+     */
+    const historyBeforeRef =
+        useRef<CanvasElement[] | null>(
+            null
+        );
 
     function screenToWorld(
         clientX: number,
@@ -94,7 +114,8 @@ export function useSelectionResize({
         const rect =
             container.getBoundingClientRect();
 
-        const scale = zoom / 100;
+        const scale =
+            zoom / 100;
 
         return {
             x:
@@ -117,6 +138,7 @@ export function useSelectionResize({
         current: CanvasElement
     ): Bounds {
         switch (current.type) {
+
             case "rectangle":
             case "diamond":
             case "ellipse":
@@ -143,6 +165,7 @@ export function useSelectionResize({
                         current.y2
                     ),
                 };
+
 
             case "draw": {
                 const first =
@@ -204,9 +227,11 @@ export function useSelectionResize({
                 };
             }
 
+
             case "text": {
                 const fontSize =
-                    current.fontSize ?? 20;
+                    current.fontSize ??
+                    20;
 
                 const width =
                     Math.max(
@@ -248,6 +273,7 @@ export function useSelectionResize({
         }
     }
 
+
     function handlePointerDown(
         handle: Handle,
         event: ReactPointerEvent<HTMLDivElement>
@@ -255,6 +281,13 @@ export function useSelectionResize({
         event.preventDefault();
 
         event.stopPropagation();
+
+        /*
+         * Save the complete canvas state
+         * before resizing begins.
+         */
+        historyBeforeRef.current =
+            beginHistory();
 
         resizeRef.current = {
             active: true,
@@ -271,6 +304,7 @@ export function useSelectionResize({
             event.pointerId
         );
     }
+
 
     function handlePointerMove(
         event: ReactPointerEvent<HTMLDivElement>
@@ -379,6 +413,7 @@ export function useSelectionResize({
         );
     }
 
+
     function handlePointerUp(
         event: ReactPointerEvent<HTMLDivElement>
     ) {
@@ -394,6 +429,21 @@ export function useSelectionResize({
             event.currentTarget.releasePointerCapture(
                 event.pointerId
             );
+        }
+
+        /*
+         * Record exactly one history entry
+         * for the complete resize operation.
+         */
+        if (
+            historyBeforeRef.current
+        ) {
+            commitHistory(
+                historyBeforeRef.current
+            );
+
+            historyBeforeRef.current =
+                null;
         }
 
         resizeRef.current = {
@@ -478,13 +528,6 @@ function resizeElement(
         );
     }
 
-    /*
-     * Rectangle
-     * Diamond
-     * Ellipse
-     * Line
-     * Arrow
-     */
     if (
         element.type === "rectangle" ||
         element.type === "diamond" ||
@@ -513,34 +556,35 @@ function resizeElement(
         };
     }
 
-    /*
-     * Freehand drawing
-     */
-    if (element.type === "draw") {
+    if (
+        element.type === "draw"
+    ) {
         return {
             ...element,
 
             points:
                 element.points.map(
                     (point) => ({
-                        x: transformX(
-                            point.x
-                        ),
+                        x:
+                            transformX(
+                                point.x
+                            ),
 
-                        y: transformY(
-                            point.y
-                        ),
+                        y:
+                            transformY(
+                                point.y
+                            ),
                     })
                 ),
         };
     }
 
-    /*
-     * Text
-     */
-    if (element.type === "text") {
+    if (
+        element.type === "text"
+    ) {
         const oldFontSize =
-            element.fontSize ?? 20;
+            element.fontSize ??
+            20;
 
         const oldTextWidth =
             Math.max(
@@ -582,10 +626,9 @@ function resizeElement(
         };
     }
 
-    /*
-     * Note
-     */
-    if (element.type === "note") {
+    if (
+        element.type === "note"
+    ) {
         return {
             ...element,
 
