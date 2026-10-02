@@ -12,15 +12,11 @@ import { useWhiteboard } from "../hooks/useWhiteBoard";
 
 import { renderCanvas } from "../lib/canvas/renderCanvas";
 
-import type {
-    ToolId,
-} from "../types/whiteboard";
+import type { ToolId } from "../types/whiteboard";
 
 type WhiteboardCanvasProps = {
     zoom: number;
-    onZoomChange: (
-        zoom: number
-    ) => void;
+    onZoomChange: (zoom: number) => void;
     background: string;
     dark: boolean;
     activeTool: ToolId;
@@ -34,14 +30,10 @@ export default function WhiteboardCanvas({
     activeTool,
 }: WhiteboardCanvasProps) {
     const containerRef =
-        useRef<HTMLDivElement | null>(
-            null
-        );
+        useRef<HTMLDivElement | null>(null);
 
     const canvasRef =
-        useRef<HTMLCanvasElement | null>(
-            null
-        );
+        useRef<HTMLCanvasElement | null>(null);
 
     /*
      * Canvas pan
@@ -63,6 +55,7 @@ export default function WhiteboardCanvas({
         selectedId,
         addElement,
         updateElement,
+        selectElement,
     } = useWhiteboard();
 
     /*
@@ -88,12 +81,15 @@ export default function WhiteboardCanvas({
         activeTool,
         zoom,
         pan,
+        elements,
+        selectedId,
         addElement,
         updateElement,
+        selectElement,
     });
 
     /*
-     * Render canvas.
+     * Render canvas
      */
     useEffect(() => {
         const canvas =
@@ -129,7 +125,7 @@ export default function WhiteboardCanvas({
     ]);
 
     /*
-     * Resize canvas when viewport changes.
+     * Resize canvas
      */
     useEffect(() => {
         const canvas =
@@ -182,12 +178,9 @@ export default function WhiteboardCanvas({
             style={{
                 backgroundColor:
                     background,
-
                 cursor,
-
                 touchAction:
                     "none",
-
                 overscrollBehavior:
                     "none",
             }}

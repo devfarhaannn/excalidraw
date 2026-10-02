@@ -1,16 +1,18 @@
 "use client";
 
-import { useRef } from "react";
+import {
+    useRef,
+    type PointerEvent as ReactPointerEvent,
+    type RefObject,
+} from "react";
 
 import type {
     CanvasElement,
+    Point,
     ToolId,
 } from "../types/whiteboard";
 
-type Point = {
-    x: number;
-    y: number;
-};
+import { hitTest } from "../lib/canvas/hitTest";
 
 type Pan = {
     x: number;
@@ -18,18 +20,31 @@ type Pan = {
 };
 
 type UseCanvasDrawingProps = {
-    containerRef: React.RefObject<HTMLDivElement | null>;
+    containerRef: RefObject<HTMLDivElement | null>;
+
     activeTool: ToolId;
+
     zoom: number;
+
     pan: Pan;
+
+    elements: CanvasElement[];
+
+    selectedId: number | null;
+
     addElement: (
         element: CanvasElement
     ) => void;
+
     updateElement: (
         id: number,
         update: (
             element: CanvasElement
         ) => CanvasElement
+    ) => void;
+
+    selectElement: (
+        id: number | null
     ) => void;
 };
 
@@ -48,13 +63,16 @@ export function useCanvasDrawing({
     activeTool,
     zoom,
     pan,
+    elements,
     addElement,
     updateElement,
+    selectElement,
 }: UseCanvasDrawingProps) {
     const drawingRef =
         useRef<DrawingState>({
             active: false,
         });
+
 
     function screenToWorld(
         clientX: number,
@@ -92,9 +110,14 @@ export function useCanvasDrawing({
         };
     }
 
+
+
     function createId() {
-        return Date.now() + Math.floor(
-            Math.random() * 1000
+        return (
+            Date.now() +
+            Math.floor(
+                Math.random() * 1000
+            )
         );
     }
 
@@ -115,27 +138,25 @@ export function useCanvasDrawing({
         );
     }
 
-    /*
-     * POINTER DOWN
-     */
+
     function handlePointerDown(
-        event: React.PointerEvent<HTMLDivElement>
+        event: ReactPointerEvent<HTMLDivElement>
     ) {
         /*
-         * Only left mouse button creates objects.
+         * Only left mouse button
+         * creates/selects objects.
          */
         if (event.button !== 0) {
             return;
         }
 
         /*
-         * Hand and lock are handled elsewhere.
+         * Hand and lock are handled
+         * by the pan layer / future lock logic.
          */
         if (
             activeTool === "hand" ||
-            activeTool === "lock" ||
-            activeTool === "select" ||
-            activeTool === "eraser"
+            activeTool === "lock"
         ) {
             return;
         }
@@ -146,9 +167,42 @@ export function useCanvasDrawing({
                 event.clientY
             );
 
-        /*
-         * TEXT
-         */
+
+
+        if (
+            activeTool === "select"
+        ) {
+            const selected =
+                hitTest(
+                    world,
+                    elements
+                );
+
+            if (!selected) {
+                selectElement(null);
+                return;
+            }
+
+            selectElement(
+                selected.id
+            );
+
+            return;
+        }
+
+
+        if (
+            activeTool === "eraser"
+        ) {
+            /*
+             * Eraser movement/removal will
+             * be completed after selection.
+             */
+            return;
+        }
+
+
+
         if (
             activeTool === "text"
         ) {
@@ -175,9 +229,6 @@ export function useCanvasDrawing({
             return;
         }
 
-        /*
-         * NOTE
-         */
         if (
             activeTool === "note"
         ) {
@@ -206,9 +257,7 @@ export function useCanvasDrawing({
             return;
         }
 
-        /*
-         * FREEHAND DRAW
-         */
+
         if (
             activeTool === "draw"
         ) {
@@ -233,9 +282,8 @@ export function useCanvasDrawing({
             return;
         }
 
-        /*
-         * SHAPES
-         */
+
+
         if (
             isShapeTool(activeTool)
         ) {
@@ -262,11 +310,10 @@ export function useCanvasDrawing({
         }
     }
 
-    /*
-     * POINTER MOVE
-     */
+
+
     function handlePointerMove(
-        event: React.PointerEvent<HTMLDivElement>
+        event: ReactPointerEvent<HTMLDivElement>
     ) {
         const drawing =
             drawingRef.current;
@@ -281,9 +328,7 @@ export function useCanvasDrawing({
                 event.clientY
             );
 
-        /*
-         * FREEHAND
-         */
+
         if (
             drawing.tool === "draw"
         ) {
@@ -310,9 +355,7 @@ export function useCanvasDrawing({
             return;
         }
 
-        /*
-         * SHAPES
-         */
+
         if (
             isShapeTool(
                 drawing.tool
@@ -343,11 +386,9 @@ export function useCanvasDrawing({
         }
     }
 
-    /*
-     * POINTER UP
-     */
+
     function handlePointerUp(
-        event: React.PointerEvent<HTMLDivElement>
+        event: ReactPointerEvent<HTMLDivElement>
     ) {
         const drawing =
             drawingRef.current;
@@ -370,6 +411,7 @@ export function useCanvasDrawing({
             active: false,
         };
     }
+
 
     return {
         handlePointerDown,
