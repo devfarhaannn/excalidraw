@@ -5,17 +5,22 @@ import {
     useRef,
 } from "react";
 
+import { useCanvasDrawing } from "../hooks/useCanvasDrawing";
 import { useCanvasPan } from "../hooks/useCanvasPan";
 import { useCanvasZoom } from "../hooks/useCanvasZoom";
 import { useWhiteboard } from "../hooks/useWhiteBoard";
 
 import { renderCanvas } from "../lib/canvas/renderCanvas";
 
-import type { ToolId } from "../types/whiteboard";
+import type {
+    ToolId,
+} from "../types/whiteboard";
 
 type WhiteboardCanvasProps = {
     zoom: number;
-    onZoomChange: (zoom: number) => void;
+    onZoomChange: (
+        zoom: number
+    ) => void;
     background: string;
     dark: boolean;
     activeTool: ToolId;
@@ -29,10 +34,14 @@ export default function WhiteboardCanvas({
     activeTool,
 }: WhiteboardCanvasProps) {
     const containerRef =
-        useRef<HTMLDivElement | null>(null);
+        useRef<HTMLDivElement | null>(
+            null
+        );
 
     const canvasRef =
-        useRef<HTMLCanvasElement | null>(null);
+        useRef<HTMLCanvasElement | null>(
+            null
+        );
 
     /*
      * Canvas pan
@@ -52,6 +61,8 @@ export default function WhiteboardCanvas({
     const {
         elements,
         selectedId,
+        addElement,
+        updateElement,
     } = useWhiteboard();
 
     /*
@@ -66,8 +77,23 @@ export default function WhiteboardCanvas({
     });
 
     /*
-     * Render canvas whenever
-     * something changes.
+     * Drawing tools
+     */
+    const {
+        handlePointerDown,
+        handlePointerMove,
+        handlePointerUp,
+    } = useCanvasDrawing({
+        containerRef,
+        activeTool,
+        zoom,
+        pan,
+        addElement,
+        updateElement,
+    });
+
+    /*
+     * Render canvas.
      */
     useEffect(() => {
         const canvas =
@@ -103,8 +129,7 @@ export default function WhiteboardCanvas({
     ]);
 
     /*
-     * Re-render when the viewport
-     * size changes.
+     * Resize canvas when viewport changes.
      */
     useEffect(() => {
         const canvas =
@@ -165,6 +190,21 @@ export default function WhiteboardCanvas({
 
                 overscrollBehavior:
                     "none",
+            }}
+            onPointerDown={
+                handlePointerDown
+            }
+            onPointerMove={
+                handlePointerMove
+            }
+            onPointerUp={
+                handlePointerUp
+            }
+            onPointerCancel={
+                handlePointerUp
+            }
+            onContextMenu={(event) => {
+                event.preventDefault();
             }}
         >
             <canvas
