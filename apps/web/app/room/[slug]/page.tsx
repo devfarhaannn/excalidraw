@@ -22,8 +22,6 @@ import {
     Sun,
     Users,
     X,
-    Undo2,
-    Redo2,
     type LucideIcon,
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
@@ -782,41 +780,6 @@ export default function RoomPage() {
                 </button>
             </div>
 
-
-            <div
-                className={[
-                    "absolute bottom-4 left-4 z-30 flex items-center rounded-xl border p-1 shadow-[0_8px_30px_rgba(20,20,30,.08)] backdrop-blur-xl",
-                    isDark
-                        ? "border-white/10 bg-[#242429]/95"
-                        : "border-black/[0.07] bg-white/[0.96]",
-                ].join(" ")}
-            >
-                <button
-                    type="button"
-                    title="Undo"
-                    className={[
-                        "flex h-8 w-8 items-center justify-center rounded-lg",
-                        isDark
-                            ? "text-white/35 hover:bg-white/[0.07]"
-                            : "text-[#b0b0b8] hover:bg-[#f5f4fa]",
-                    ].join(" ")}
-                >
-                    <Undo2 className="h-4 w-4" />
-                </button>
-
-                <button
-                    type="button"
-                    title="Redo"
-                    className={[
-                        "flex h-8 w-8 items-center justify-center rounded-lg",
-                        isDark
-                            ? "text-white/35 hover:bg-white/[0.07]"
-                            : "text-[#b0b0b8] hover:bg-[#f5f4fa]",
-                    ].join(" ")}
-                >
-                    <Redo2 className="h-4 w-4" />
-                </button>
-            </div>
 
             <div
                 className={[

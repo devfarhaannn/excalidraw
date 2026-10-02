@@ -131,9 +131,6 @@ export default function WhiteboardCanvas({
 
         /*
          * New text
-         *
-         * addElement() automatically records
-         * the previous state.
          */
         if (
             textEditor.elementId === null
@@ -160,9 +157,6 @@ export default function WhiteboardCanvas({
 
         /*
          * Edit existing text
-         *
-         * Save the state before modifying it
-         * so Undo can restore the old text.
          */
         else {
             const beforeElements =
@@ -199,7 +193,6 @@ export default function WhiteboardCanvas({
         setTextEditor(null);
     }
 
-
     const {
         pan,
         setPan,
@@ -210,7 +203,6 @@ export default function WhiteboardCanvas({
         activeTool,
     });
 
-
     useCanvasZoom({
         containerRef,
         zoom,
@@ -218,7 +210,6 @@ export default function WhiteboardCanvas({
         pan,
         onPanChange: setPan,
     });
-
 
     const {
         handlePointerDown,
@@ -293,7 +284,9 @@ export default function WhiteboardCanvas({
                 !event.shiftKey
             ) {
                 event.preventDefault();
+
                 undo();
+
                 return;
             }
 
@@ -307,7 +300,9 @@ export default function WhiteboardCanvas({
                 event.shiftKey
             ) {
                 event.preventDefault();
+
                 redo();
+
                 return;
             }
 
@@ -320,6 +315,7 @@ export default function WhiteboardCanvas({
                 event.key.toLowerCase() === "y"
             ) {
                 event.preventDefault();
+
                 redo();
             }
         }
@@ -372,7 +368,8 @@ export default function WhiteboardCanvas({
         dark,
     ]);
 
-
+    /*
+     */
     useEffect(() => {
         const canvas =
             canvasRef.current;
@@ -415,7 +412,6 @@ export default function WhiteboardCanvas({
         dark,
     ]);
 
-
     const selectedElement =
         selectedId === null
             ? null
@@ -450,7 +446,6 @@ export default function WhiteboardCanvas({
                 event.preventDefault();
             }}
         >
-
             <canvas
                 ref={canvasRef}
                 className="absolute inset-0 block h-full w-full"
@@ -459,17 +454,35 @@ export default function WhiteboardCanvas({
 
             <div
                 className={[
-                    "absolute bottom-4 left-4 z-40 flex items-center rounded-xl border p-1 shadow-[0_8px_30px_rgba(20,20,30,.08)] backdrop-blur-xl",
+                    "absolute bottom-4 left-4 z-50 flex items-center rounded-xl border p-1 shadow-[0_8px_30px_rgba(20,20,30,.08)] backdrop-blur-xl",
                     dark
                         ? "border-white/10 bg-[#242429]/95"
                         : "border-black/[0.07] bg-white/[0.96]",
                 ].join(" ")}
+                onPointerDown={(event) => {
+                    event.stopPropagation();
+                }}
+                onPointerUp={(event) => {
+                    event.stopPropagation();
+                }}
             >
+                {/* UNDO */}
                 <button
                     type="button"
                     title="Undo"
                     disabled={!canUndo}
-                    onClick={undo}
+                    onPointerDown={(event) => {
+                        event.stopPropagation();
+                    }}
+                    onPointerUp={(event) => {
+                        event.stopPropagation();
+                    }}
+                    onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+
+                        undo();
+                    }}
                     className={[
                         "flex h-8 w-8 items-center justify-center rounded-lg transition-colors",
                         !canUndo
@@ -484,11 +497,23 @@ export default function WhiteboardCanvas({
                     <Undo2 className="h-4 w-4" />
                 </button>
 
+                {/* REDO */}
                 <button
                     type="button"
                     title="Redo"
                     disabled={!canRedo}
-                    onClick={redo}
+                    onPointerDown={(event) => {
+                        event.stopPropagation();
+                    }}
+                    onPointerUp={(event) => {
+                        event.stopPropagation();
+                    }}
+                    onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+
+                        redo();
+                    }}
                     className={[
                         "flex h-8 w-8 items-center justify-center rounded-lg transition-colors",
                         !canRedo
@@ -525,7 +550,6 @@ export default function WhiteboardCanvas({
                     }
                 />
             )}
-
 
             {textEditor && (
                 <TextEditorOverlay
