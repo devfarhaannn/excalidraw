@@ -3,10 +3,12 @@
 import {
     useEffect,
     useRef,
+    useState,
 } from "react";
 
 import {
     useCanvasDrawing,
+    type TextEditingTarget,
 } from "../hooks/useCanvasDrawing";
 
 import {
@@ -26,6 +28,7 @@ import {
 } from "../lib/canvas/renderCanvas";
 
 import SelectionOverlay from "./SelectionOverlay";
+import TextEditorOverlay from "./TextEditorOverlay";
 
 import type {
     ToolId,
@@ -59,6 +62,7 @@ export default function WhiteboardCanvas({
         );
 
 
+
     const {
         elements,
         selectedId,
@@ -67,6 +71,109 @@ export default function WhiteboardCanvas({
         deleteElement,
         selectElement,
     } = useWhiteboard();
+
+
+
+    const [
+        textEditor,
+        setTextEditor,
+    ] = useState<TextEditingTarget | null>(
+        null
+    );
+
+    function startTextEditing(
+        target: TextEditingTarget
+    ) {
+        setTextEditor(target);
+    }
+
+    function updateTextEditor(
+        value: string
+    ) {
+        setTextEditor((current) => {
+            if (!current) {
+                return null;
+            }
+
+            return {
+                ...current,
+                text: value,
+            };
+        });
+    }
+
+    function commitTextEditing() {
+        if (!textEditor) {
+            return;
+        }
+
+        const value =
+            textEditor.text.trim();
+
+        /*
+         * Empty text = cancel
+         */
+        if (!value) {
+            setTextEditor(null);
+            return;
+        }
+
+        /*
+         * New text
+         */
+        if (
+            textEditor.elementId === null
+        ) {
+            addElement({
+                id:
+                    Date.now() +
+                    Math.floor(
+                        Math.random() * 1000
+                    ),
+
+                type: "text",
+
+                x: textEditor.x,
+
+                y: textEditor.y,
+
+                text: value,
+
+                fontSize:
+                    textEditor.fontSize,
+            });
+        }
+
+        /*
+         * Edit existing text
+         */
+        else {
+            updateElement(
+                textEditor.elementId,
+                (current) => {
+                    if (
+                        current.type !==
+                        "text"
+                    ) {
+                        return current;
+                    }
+
+                    return {
+                        ...current,
+                        text: value,
+                        fontSize:
+                            textEditor.fontSize,
+                    };
+                }
+            );
+        }
+
+        setTextEditor(null);
+    }
+
+    function cancelTextEditing() {
+        setTextEditor(null);
+    }
 
 
 
@@ -81,7 +188,6 @@ export default function WhiteboardCanvas({
     });
 
 
-
     useCanvasZoom({
         containerRef,
         zoom,
@@ -89,6 +195,7 @@ export default function WhiteboardCanvas({
         pan,
         onPanChange: setPan,
     });
+
 
 
     const {
@@ -106,6 +213,8 @@ export default function WhiteboardCanvas({
         deleteElement,
         selectElement,
         spacePressed,
+        onStartTextEditing:
+            startTextEditing,
     });
 
 
@@ -140,6 +249,7 @@ export default function WhiteboardCanvas({
         background,
         dark,
     ]);
+
 
 
     useEffect(() => {
@@ -183,7 +293,6 @@ export default function WhiteboardCanvas({
         background,
         dark,
     ]);
-
 
 
     const selectedElement =
@@ -238,6 +347,29 @@ export default function WhiteboardCanvas({
                     pan={pan}
                     updateElement={
                         updateElement
+                    }
+                />
+            )}
+
+            {textEditor && (
+                <TextEditorOverlay
+                    x={textEditor.x}
+                    y={textEditor.y}
+                    text={textEditor.text}
+                    fontSize={
+                        textEditor.fontSize
+                    }
+                    zoom={zoom}
+                    pan={pan}
+                    dark={dark}
+                    onChange={
+                        updateTextEditor
+                    }
+                    onCommit={
+                        commitTextEditing
+                    }
+                    onCancel={
+                        cancelTextEditing
                     }
                 />
             )}

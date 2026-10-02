@@ -18,6 +18,13 @@ type Pan = {
     x: number;
     y: number;
 };
+export type TextEditingTarget = {
+    x: number;
+    y: number;
+    text: string;
+    fontSize: number;
+    elementId: number | null;
+};
 
 type UseCanvasDrawingProps = {
     containerRef: RefObject<HTMLDivElement | null>;
@@ -46,6 +53,9 @@ type UseCanvasDrawingProps = {
     ) => void;
 
     spacePressed: boolean;
+    onStartTextEditing: (
+        target: TextEditingTarget
+    ) => void;
 };
 
 type DrawingState =
@@ -74,6 +84,7 @@ export function useCanvasDrawing({
     deleteElement,
     selectElement,
     spacePressed,
+    onStartTextEditing
 }: UseCanvasDrawingProps) {
     const drawingRef =
         useRef<DrawingState>({
@@ -192,24 +203,36 @@ export function useCanvasDrawing({
                     elements
                 );
 
-            /*
-             * Click empty canvas.
-             */
             if (!selected) {
                 selectElement(null);
                 return;
             }
 
-            /*
-             * Select object.
-             */
             selectElement(
                 selected.id
             );
 
             /*
-             * Start moving selected object.
+             * Double-click existing text
+             * to edit it.
              */
+            if (
+                selected.type === "text" &&
+                event.detail === 2
+            ) {
+                onStartTextEditing({
+                    x: selected.x,
+                    y: selected.y,
+                    text: selected.text,
+                    fontSize:
+                        selected.fontSize ?? 20,
+                    elementId:
+                        selected.id,
+                });
+
+                return;
+            }
+
             event.currentTarget.setPointerCapture(
                 event.pointerId
             );
@@ -270,25 +293,12 @@ export function useCanvasDrawing({
         if (
             activeTool === "text"
         ) {
-            const text =
-                window.prompt(
-                    "Enter text"
-                );
-
-            if (
-                !text ||
-                !text.trim()
-            ) {
-                return;
-            }
-
-            addElement({
-                id: createId(),
-                type: "text",
+            onStartTextEditing({
                 x: world.x,
                 y: world.y,
-                text: text.trim(),
+                text: "",
                 fontSize: 20,
+                elementId: null,
             });
 
             return;
