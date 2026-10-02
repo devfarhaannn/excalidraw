@@ -425,6 +425,7 @@ export default function DashboardPage() {
                     id: number;
                     slug: string;
                     createdAt: string;
+                    starred: boolean;
                 },
                 index: number
             ) => ({
@@ -432,7 +433,7 @@ export default function DashboardPage() {
                 name: room.slug,
                 updated: getRelativeTime(room.createdAt),
                 collaborators: 1,
-                starred: false,
+                starred: room.starred,
                 shared: false,
                 accent: (["purple", "orange", "green"] as Accent[])[
                     index % 3
