@@ -149,11 +149,11 @@ export function hitTest(
          */
         if (
             element.type ===
-                "rectangle" ||
+            "rectangle" ||
             element.type ===
-                "diamond" ||
+            "diamond" ||
             element.type ===
-                "ellipse"
+            "ellipse"
         ) {
             const minX = Math.min(
                 element.x1,
@@ -196,10 +196,18 @@ export function hitTest(
         if (
             element.type === "text"
         ) {
+            const fontSize =
+                element.fontSize ?? 20;
+
             const width = Math.max(
-                element.text.length * 10,
-                20
+                element.text.length *
+                fontSize *
+                0.55,
+                fontSize
             );
+
+            const height =
+                fontSize * 1.2;
 
             if (
                 isInsideBounds(
@@ -207,7 +215,7 @@ export function hitTest(
                     element.x,
                     element.y,
                     element.x + width,
-                    element.y + 24
+                    element.y + height
                 )
             ) {
                 return element;
@@ -228,9 +236,9 @@ export function hitTest(
                     element.x,
                     element.y,
                     element.x +
-                        element.width,
+                    element.width,
                     element.y +
-                        element.height
+                    element.height
                 )
             ) {
                 return element;

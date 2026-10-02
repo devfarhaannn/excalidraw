@@ -39,11 +39,13 @@ export type DrawElement = BaseElement & {
     points: Point[];
 };
 
-export type TextElement = BaseElement & {
+export type TextElement = {
+    id: number;
     type: "text";
     x: number;
     y: number;
     text: string;
+    fontSize?: number;
 };
 
 export type NoteElement = BaseElement & {

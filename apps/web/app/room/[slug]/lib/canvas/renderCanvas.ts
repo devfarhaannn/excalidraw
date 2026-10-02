@@ -151,13 +151,13 @@ function drawElement(
         const width =
             Math.abs(
                 element.x2 -
-                    element.x1
+                element.x1
             );
 
         const height =
             Math.abs(
                 element.y2 -
-                    element.y1
+                element.y1
             );
 
         ctx.strokeRect(
@@ -256,13 +256,13 @@ function drawElement(
         const radiusX =
             Math.abs(
                 element.x2 -
-                    element.x1
+                element.x1
             ) / 2;
 
         const radiusY =
             Math.abs(
                 element.y2 -
-                    element.y1
+                element.y1
             ) / 2;
 
         ctx.beginPath();
@@ -391,8 +391,11 @@ function drawElement(
     if (
         element.type === "text"
     ) {
+        const fontSize =
+            element.fontSize ?? 20;
+
         ctx.font =
-            "18px Inter, Arial, sans-serif";
+            `${fontSize}px Inter, Arial, sans-serif`;
 
         ctx.textBaseline =
             "top";
@@ -485,17 +488,17 @@ function drawArrowHead(
 
     ctx.lineTo(
         x2 -
-            size *
-                Math.cos(
-                    angle -
-                        Math.PI / 6
-                ),
+        size *
+        Math.cos(
+            angle -
+            Math.PI / 6
+        ),
         y2 -
-            size *
-                Math.sin(
-                    angle -
-                        Math.PI / 6
-                )
+        size *
+        Math.sin(
+            angle -
+            Math.PI / 6
+        )
     );
 
     /*
@@ -508,17 +511,17 @@ function drawArrowHead(
 
     ctx.lineTo(
         x2 -
-            size *
-                Math.cos(
-                    angle +
-                        Math.PI / 6
-                ),
+        size *
+        Math.cos(
+            angle +
+            Math.PI / 6
+        ),
         y2 -
-            size *
-                Math.sin(
-                    angle +
-                        Math.PI / 6
-                )
+        size *
+        Math.sin(
+            angle +
+            Math.PI / 6
+        )
     );
 
     ctx.stroke();

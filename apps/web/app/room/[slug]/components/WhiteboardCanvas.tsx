@@ -5,18 +5,36 @@ import {
     useRef,
 } from "react";
 
-import { useCanvasDrawing } from "../hooks/useCanvasDrawing";
-import { useCanvasPan } from "../hooks/useCanvasPan";
-import { useCanvasZoom } from "../hooks/useCanvasZoom";
-import { useWhiteboard } from "../hooks/useWhiteBoard";
+import {
+    useCanvasDrawing,
+} from "../hooks/useCanvasDrawing";
 
-import { renderCanvas } from "../lib/canvas/renderCanvas";
+import {
+    useCanvasPan,
+} from "../hooks/useCanvasPan";
+
+import {
+    useCanvasZoom,
+} from "../hooks/useCanvasZoom";
+
+import {
+    useWhiteboard,
+} from "../hooks/useWhiteBoard";
+
+import {
+    renderCanvas,
+} from "../lib/canvas/renderCanvas";
 
 import SelectionOverlay from "./SelectionOverlay";
 
 import type {
     ToolId,
 } from "../types/whiteboard";
+
+type Pan = {
+    x: number;
+    y: number;
+};
 
 type WhiteboardCanvasProps = {
     zoom: number;
@@ -55,8 +73,6 @@ export default function WhiteboardCanvas({
         activeTool,
     });
 
-
-
     const {
         elements,
         selectedId,
@@ -66,7 +82,6 @@ export default function WhiteboardCanvas({
         selectElement,
     } = useWhiteboard();
 
-
     useCanvasZoom({
         containerRef,
         zoom,
@@ -75,13 +90,7 @@ export default function WhiteboardCanvas({
         onPanChange: setPan,
     });
 
-
-
-    const {
-        handlePointerDown,
-        handlePointerMove,
-        handlePointerUp,
-    } = useCanvasDrawing({
+    useCanvasDrawing({
         containerRef,
         activeTool,
         zoom,
@@ -93,16 +102,6 @@ export default function WhiteboardCanvas({
         selectElement,
         spacePressed,
     });
-
-    /*
- 
-     *
-     * renderCanvas only draws the actual
-     * whiteboard objects.
-     *
-     * Selection UI is handled separately
-     * by SelectionOverlay.
-     */
 
     useEffect(() => {
         const canvas =
@@ -134,8 +133,6 @@ export default function WhiteboardCanvas({
         background,
         dark,
     ]);
-
-
 
     useEffect(() => {
         const canvas =
@@ -179,7 +176,6 @@ export default function WhiteboardCanvas({
         dark,
     ]);
 
-
     const selectedElement =
         selectedId === null
             ? null
@@ -189,42 +185,18 @@ export default function WhiteboardCanvas({
                       selectedId
               );
 
-
     return (
         <div
             ref={containerRef}
-            className="fixed inset-0 overflow-hidden select-none"
+            className="fixed inset-0 overflow-hidden"
             style={{
-                backgroundColor:
-                    background,
-
                 cursor,
-
-                touchAction:
-                    "none",
-
-                overscrollBehavior:
-                    "none",
-            }}
-            onPointerDown={
-                handlePointerDown
-            }
-            onPointerMove={
-                handlePointerMove
-            }
-            onPointerUp={
-                handlePointerUp
-            }
-            onPointerCancel={
-                handlePointerUp
-            }
-            onContextMenu={(event) => {
-                event.preventDefault();
+                touchAction: "none",
             }}
         >
             <canvas
                 ref={canvasRef}
-                className="absolute inset-0 block"
+                className="absolute inset-0 block h-full w-full"
             />
 
             {selectedElement && (
@@ -237,6 +209,9 @@ export default function WhiteboardCanvas({
                     }
                     zoom={zoom}
                     pan={pan}
+                    updateElement={
+                        updateElement
+                    }
                 />
             )}
         </div>

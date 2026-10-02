@@ -3,8 +3,14 @@
 import {
     useEffect,
     useState,
+    type PointerEvent as ReactPointerEvent,
     type RefObject,
 } from "react";
+
+import {
+    useSelectionResize,
+    type Handle,
+} from "../hooks/useSelectionResize";
 
 import type {
     CanvasElement,
@@ -20,6 +26,12 @@ type SelectionOverlayProps = {
     element: CanvasElement;
     zoom: number;
     pan: Pan;
+    updateElement: (
+        id: number,
+        update: (
+            element: CanvasElement
+        ) => CanvasElement
+    ) => void;
 };
 
 type Bounds = {
@@ -34,6 +46,7 @@ export default function SelectionOverlay({
     element,
     zoom,
     pan,
+    updateElement,
 }: SelectionOverlayProps) {
     const [
         viewport,
@@ -41,6 +54,18 @@ export default function SelectionOverlay({
     ] = useState({
         width: 0,
         height: 0,
+    });
+
+    const {
+        handlePointerDown,
+        handlePointerMove,
+        handlePointerUp,
+    } = useSelectionResize({
+        containerRef,
+        element,
+        zoom,
+        pan,
+        updateElement,
     });
 
     useEffect(() => {
@@ -96,12 +121,14 @@ export default function SelectionOverlay({
         padding;
 
     const width =
-        (bounds.maxX - bounds.minX) *
+        (bounds.maxX -
+            bounds.minX) *
             scale +
         padding * 2;
 
     const height =
-        (bounds.maxY - bounds.minY) *
+        (bounds.maxY -
+            bounds.minY) *
             scale +
         padding * 2;
 
@@ -118,47 +145,116 @@ export default function SelectionOverlay({
             style={{
                 left,
                 top,
-                width: Math.max(width, 12),
-                height: Math.max(height, 12),
+                width: Math.max(
+                    width,
+                    12
+                ),
+                height: Math.max(
+                    height,
+                    12
+                ),
             }}
         >
-            {/* Selection border */}
-            <div className="absolute inset-0 rounded-[2px] border border-[#625DF5] border-dashed" />
+            <div className="absolute inset-0 rounded-[2px] border border-dashed border-[#625DF5]" />
 
-            {/* Top-left handle */}
-            <Handle
-                className="-left-[4px] -top-[4px]"
+            <ResizeHandle
+                handle="nw"
+                className="-left-[4px] -top-[4px] cursor-nwse-resize"
+                onPointerDown={
+                    handlePointerDown
+                }
+                onPointerMove={
+                    handlePointerMove
+                }
+                onPointerUp={
+                    handlePointerUp
+                }
             />
 
-            {/* Top-right handle */}
-            <Handle
-                className="-right-[4px] -top-[4px]"
+            <ResizeHandle
+                handle="ne"
+                className="-right-[4px] -top-[4px] cursor-nesw-resize"
+                onPointerDown={
+                    handlePointerDown
+                }
+                onPointerMove={
+                    handlePointerMove
+                }
+                onPointerUp={
+                    handlePointerUp
+                }
             />
 
-            {/* Bottom-left handle */}
-            <Handle
-                className="-bottom-[4px] -left-[4px]"
+            <ResizeHandle
+                handle="sw"
+                className="-bottom-[4px] -left-[4px] cursor-nesw-resize"
+                onPointerDown={
+                    handlePointerDown
+                }
+                onPointerMove={
+                    handlePointerMove
+                }
+                onPointerUp={
+                    handlePointerUp
+                }
             />
 
-            {/* Bottom-right handle */}
-            <Handle
-                className="-bottom-[4px] -right-[4px]"
+            <ResizeHandle
+                handle="se"
+                className="-bottom-[4px] -right-[4px] cursor-nwse-resize"
+                onPointerDown={
+                    handlePointerDown
+                }
+                onPointerMove={
+                    handlePointerMove
+                }
+                onPointerUp={
+                    handlePointerUp
+                }
             />
         </div>
     );
 }
 
-function Handle({
+function ResizeHandle({
+    handle,
     className,
+    onPointerDown,
+    onPointerMove,
+    onPointerUp,
 }: {
+    handle: Handle;
     className: string;
+    onPointerDown: (
+        handle: Handle,
+        event: ReactPointerEvent<HTMLDivElement>
+    ) => void;
+    onPointerMove: (
+        event: ReactPointerEvent<HTMLDivElement>
+    ) => void;
+    onPointerUp: (
+        event: ReactPointerEvent<HTMLDivElement>
+    ) => void;
 }) {
     return (
         <div
+            data-handle={handle}
             className={[
-                "absolute h-2 w-2 rounded-[2px] border border-white bg-[#625DF5] shadow-sm",
+                "pointer-events-auto absolute h-2.5 w-2.5 rounded-[2px] border border-white bg-[#625DF5] shadow-sm",
                 className,
             ].join(" ")}
+            onPointerDown={(event) =>
+                onPointerDown(
+                    handle,
+                    event
+                )
+            }
+            onPointerMove={
+                onPointerMove
+            }
+            onPointerUp={
+                onPointerUp
+            }
         />
     );
 }
@@ -192,10 +288,10 @@ function getElementBounds(
             };
 
         case "draw": {
-            const firstPoint =
+            const first =
                 element.points[0];
 
-            if (!firstPoint) {
+            if (!first) {
                 return {
                     minX: 0,
                     minY: 0,
@@ -204,10 +300,10 @@ function getElementBounds(
                 };
             }
 
-            let minX = firstPoint.x;
-            let minY = firstPoint.y;
-            let maxX = firstPoint.x;
-            let maxY = firstPoint.y;
+            let minX = first.x;
+            let minY = first.y;
+            let maxX = first.x;
+            let maxY = first.y;
 
             for (
                 let i = 1;
@@ -250,20 +346,29 @@ function getElementBounds(
             };
         }
 
-        case "text":
+        case "text": {
+            const fontSize =
+                element.fontSize ?? 20;
+
+            const textWidth =
+                Math.max(
+                    element.text.length *
+                        fontSize *
+                        0.55,
+                    fontSize
+                );
+
             return {
                 minX: element.x,
                 minY: element.y,
                 maxX:
                     element.x +
-                    Math.max(
-                        element.text.length *
-                            10,
-                        20
-                    ),
+                    textWidth,
                 maxY:
-                    element.y + 24,
+                    element.y +
+                    fontSize * 1.2,
             };
+        }
 
         case "note":
             return {

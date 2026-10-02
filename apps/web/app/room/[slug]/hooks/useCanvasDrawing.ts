@@ -50,18 +50,18 @@ type UseCanvasDrawingProps = {
 
 type DrawingState =
     | {
-          active: false;
-      }
+        active: false;
+    }
     | {
-          active: true;
-          mode:
-              | "draw"
-              | "move"
-              | "erase";
-          elementId: number;
-          tool: ToolId;
-          lastWorld: Point;
-      };
+        active: true;
+        mode:
+        | "draw"
+        | "move"
+        | "erase";
+        elementId: number;
+        tool: ToolId;
+        lastWorld: Point;
+    };
 
 export function useCanvasDrawing({
     containerRef,
@@ -118,11 +118,6 @@ export function useCanvasDrawing({
         };
     }
 
-    /*
-     * ------------------------------------------
-     * CREATE ID
-     * ------------------------------------------
-     */
 
     function createId() {
         return (
@@ -293,6 +288,7 @@ export function useCanvasDrawing({
                 x: world.x,
                 y: world.y,
                 text: text.trim(),
+                fontSize: 20,
             });
 
             return;
@@ -425,7 +421,7 @@ export function useCanvasDrawing({
                 drawing.elementId,
                 (element) => {
                     switch (
-                        element.type
+                    element.type
                     ) {
                         case "rectangle":
                         case "diamond":
@@ -551,11 +547,6 @@ export function useCanvasDrawing({
             return;
         }
 
-        /*
-         * --------------------------------------
-         * SHAPES
-         * --------------------------------------
-         */
 
         if (
             isShapeTool(
@@ -566,7 +557,7 @@ export function useCanvasDrawing({
                 drawing.elementId,
                 (element) => {
                     switch (
-                        element.type
+                    element.type
                     ) {
                         case "rectangle":
                         case "diamond":
