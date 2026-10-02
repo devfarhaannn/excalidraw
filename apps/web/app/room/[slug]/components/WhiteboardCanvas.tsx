@@ -12,6 +12,8 @@ import { useWhiteboard } from "../hooks/useWhiteBoard";
 
 import { renderCanvas } from "../lib/canvas/renderCanvas";
 
+import SelectionOverlay from "./SelectionOverlay";
+
 import type {
     ToolId,
 } from "../types/whiteboard";
@@ -43,9 +45,6 @@ export default function WhiteboardCanvas({
             null
         );
 
-    /*
-     * PAN
-     */
     const {
         pan,
         setPan,
@@ -56,9 +55,8 @@ export default function WhiteboardCanvas({
         activeTool,
     });
 
-    /*
-     * WHITEBOARD STATE
-     */
+
+
     const {
         elements,
         selectedId,
@@ -68,9 +66,7 @@ export default function WhiteboardCanvas({
         selectElement,
     } = useWhiteboard();
 
-    /*
-     * ZOOM
-     */
+
     useCanvasZoom({
         containerRef,
         zoom,
@@ -79,9 +75,8 @@ export default function WhiteboardCanvas({
         onPanChange: setPan,
     });
 
-    /*
-     * DRAWING + SELECT + ERASER
-     */
+
+
     const {
         handlePointerDown,
         handlePointerMove,
@@ -100,8 +95,15 @@ export default function WhiteboardCanvas({
     });
 
     /*
-     * RENDER
+ 
+     *
+     * renderCanvas only draws the actual
+     * whiteboard objects.
+     *
+     * Selection UI is handled separately
+     * by SelectionOverlay.
      */
+
     useEffect(() => {
         const canvas =
             canvasRef.current;
@@ -120,7 +122,6 @@ export default function WhiteboardCanvas({
             canvas,
             container,
             elements,
-            selectedId,
             pan,
             zoom,
             background,
@@ -128,16 +129,14 @@ export default function WhiteboardCanvas({
         });
     }, [
         elements,
-        selectedId,
         pan,
         zoom,
         background,
         dark,
     ]);
 
-    /*
-     * RESIZE
-     */
+
+
     useEffect(() => {
         const canvas =
             canvasRef.current;
@@ -153,20 +152,17 @@ export default function WhiteboardCanvas({
         }
 
         const resizeObserver =
-            new ResizeObserver(
-                () => {
-                    renderCanvas({
-                        canvas,
-                        container,
-                        elements,
-                        selectedId,
-                        pan,
-                        zoom,
-                        background,
-                        dark,
-                    });
-                }
-            );
+            new ResizeObserver(() => {
+                renderCanvas({
+                    canvas,
+                    container,
+                    elements,
+                    pan,
+                    zoom,
+                    background,
+                    dark,
+                });
+            });
 
         resizeObserver.observe(
             container
@@ -177,12 +173,22 @@ export default function WhiteboardCanvas({
         };
     }, [
         elements,
-        selectedId,
         pan,
         zoom,
         background,
         dark,
     ]);
+
+
+    const selectedElement =
+        selectedId === null
+            ? null
+            : elements.find(
+                  (element) =>
+                      element.id ===
+                      selectedId
+              );
+
 
     return (
         <div
@@ -220,6 +226,19 @@ export default function WhiteboardCanvas({
                 ref={canvasRef}
                 className="absolute inset-0 block"
             />
+
+            {selectedElement && (
+                <SelectionOverlay
+                    containerRef={
+                        containerRef
+                    }
+                    element={
+                        selectedElement
+                    }
+                    zoom={zoom}
+                    pan={pan}
+                />
+            )}
         </div>
     );
 }

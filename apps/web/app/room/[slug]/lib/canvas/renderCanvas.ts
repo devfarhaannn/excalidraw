@@ -4,7 +4,6 @@ type RenderCanvasOptions = {
     canvas: HTMLCanvasElement;
     container: HTMLDivElement;
     elements: CanvasElement[];
-    selectedId: number | null;
     pan: {
         x: number;
         y: number;
@@ -18,7 +17,6 @@ export function renderCanvas({
     canvas,
     container,
     elements,
-    selectedId,
     pan,
     zoom,
     background,
@@ -36,6 +34,9 @@ export function renderCanvas({
     const dpr =
         window.devicePixelRatio || 1;
 
+    /*
+     * Set canvas resolution for Retina / high-DPI displays.
+     */
     canvas.width =
         Math.round(rect.width * dpr);
 
@@ -57,6 +58,9 @@ export function renderCanvas({
         0
     );
 
+    /*
+     * Clear previous frame.
+     */
     ctx.clearRect(
         0,
         0,
@@ -65,7 +69,7 @@ export function renderCanvas({
     );
 
     /*
-     * Canvas background
+     * Draw canvas background.
      */
     ctx.fillStyle = background;
 
@@ -77,7 +81,7 @@ export function renderCanvas({
     );
 
     /*
-     * Move into world coordinates.
+     * Move into whiteboard world coordinates.
      */
     ctx.save();
 
@@ -92,7 +96,7 @@ export function renderCanvas({
     );
 
     /*
-     * Draw every element.
+     * Draw all whiteboard elements.
      */
     for (const element of elements) {
         drawElement(
@@ -100,25 +104,6 @@ export function renderCanvas({
             element,
             dark
         );
-    }
-
-    /*
-     * Draw selection box.
-     */
-    if (selectedId !== null) {
-        const selectedElement =
-            elements.find(
-                (element) =>
-                    element.id ===
-                    selectedId
-            );
-
-        if (selectedElement) {
-            drawSelection(
-                ctx,
-                selectedElement
-            );
-        }
     }
 
     ctx.restore();
@@ -137,38 +122,43 @@ function drawElement(
 
     ctx.save();
 
-    ctx.strokeStyle = strokeColor;
-    ctx.fillStyle = strokeColor;
+    ctx.strokeStyle =
+        strokeColor;
+
+    ctx.fillStyle =
+        strokeColor;
 
     ctx.lineWidth = 2;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
 
-    /*
-     * RECTANGLE
-     */
+
     if (
         element.type === "rectangle"
     ) {
-        const x = Math.min(
-            element.x1,
-            element.x2
-        );
+        const x =
+            Math.min(
+                element.x1,
+                element.x2
+            );
 
-        const y = Math.min(
-            element.y1,
-            element.y2
-        );
+        const y =
+            Math.min(
+                element.y1,
+                element.y2
+            );
 
-        const width = Math.abs(
-            element.x2 -
-                element.x1
-        );
+        const width =
+            Math.abs(
+                element.x2 -
+                    element.x1
+            );
 
-        const height = Math.abs(
-            element.y2 -
-                element.y1
-        );
+        const height =
+            Math.abs(
+                element.y2 -
+                    element.y1
+            );
 
         ctx.strokeRect(
             x,
@@ -182,31 +172,34 @@ function drawElement(
         return;
     }
 
-    /*
-     * DIAMOND
-     */
+
+
     if (
         element.type === "diamond"
     ) {
-        const left = Math.min(
-            element.x1,
-            element.x2
-        );
+        const left =
+            Math.min(
+                element.x1,
+                element.x2
+            );
 
-        const right = Math.max(
-            element.x1,
-            element.x2
-        );
+        const right =
+            Math.max(
+                element.x1,
+                element.x2
+            );
 
-        const top = Math.min(
-            element.y1,
-            element.y2
-        );
+        const top =
+            Math.min(
+                element.y1,
+                element.y2
+            );
 
-        const bottom = Math.max(
-            element.y1,
-            element.y2
-        );
+        const bottom =
+            Math.max(
+                element.y1,
+                element.y2
+            );
 
         const centerX =
             (left + right) / 2;
@@ -245,9 +238,8 @@ function drawElement(
         return;
     }
 
-    /*
-     * ELLIPSE
-     */
+
+
     if (
         element.type === "ellipse"
     ) {
@@ -298,9 +290,7 @@ function drawElement(
         return;
     }
 
-    /*
-     * LINE
-     */
+
     if (
         element.type === "line"
     ) {
@@ -323,9 +313,7 @@ function drawElement(
         return;
     }
 
-    /*
-     * ARROW
-     */
+
     if (
         element.type === "arrow"
     ) {
@@ -356,9 +344,7 @@ function drawElement(
         return;
     }
 
-    /*
-     * FREEHAND DRAW
-     */
+
     if (
         element.type === "draw"
     ) {
@@ -402,16 +388,14 @@ function drawElement(
         return;
     }
 
-    /*
-     * TEXT
-     */
     if (
         element.type === "text"
     ) {
         ctx.font =
             "18px Inter, Arial, sans-serif";
 
-        ctx.textBaseline = "top";
+        ctx.textBaseline =
+            "top";
 
         ctx.fillText(
             element.text,
@@ -424,9 +408,7 @@ function drawElement(
         return;
     }
 
-    /*
-     * NOTE
-     */
+
     if (
         element.type === "note"
     ) {
@@ -456,7 +438,8 @@ function drawElement(
         ctx.font =
             "14px Inter, Arial, sans-serif";
 
-        ctx.textBaseline = "top";
+        ctx.textBaseline =
+            "top";
 
         drawWrappedText(
             ctx,
@@ -473,7 +456,6 @@ function drawElement(
 
     ctx.restore();
 }
-
 
 
 function drawArrowHead(
@@ -493,6 +475,9 @@ function drawArrowHead(
 
     ctx.beginPath();
 
+    /*
+     * First wing
+     */
     ctx.moveTo(
         x2,
         y2
@@ -513,6 +498,9 @@ function drawArrowHead(
                 )
     );
 
+    /*
+     * Second wing
+     */
     ctx.moveTo(
         x2,
         y2
@@ -535,7 +523,6 @@ function drawArrowHead(
 
     ctx.stroke();
 }
-
 
 
 function drawWrappedText(
@@ -587,213 +574,4 @@ function drawWrappedText(
             lineY
         );
     }
-}
-
-
-function getBounds(
-    element: CanvasElement
-) {
-    switch (element.type) {
-        case "rectangle":
-        case "diamond":
-        case "ellipse":
-        case "line":
-        case "arrow":
-            return {
-                minX: Math.min(
-                    element.x1,
-                    element.x2
-                ),
-                minY: Math.min(
-                    element.y1,
-                    element.y2
-                ),
-                maxX: Math.max(
-                    element.x1,
-                    element.x2
-                ),
-                maxY: Math.max(
-                    element.y1,
-                    element.y2
-                ),
-            };
-
-        case "draw": {
-            const firstPoint =
-                element.points[0];
-
-            if (!firstPoint) {
-                return {
-                    minX: 0,
-                    minY: 0,
-                    maxX: 0,
-                    maxY: 0,
-                };
-            }
-
-            let minX = firstPoint.x;
-            let minY = firstPoint.y;
-            let maxX = firstPoint.x;
-            let maxY = firstPoint.y;
-
-            for (
-                let i = 1;
-                i < element.points.length;
-                i++
-            ) {
-                const point =
-                    element.points[i];
-
-                if (!point) {
-                    continue;
-                }
-
-                minX = Math.min(
-                    minX,
-                    point.x
-                );
-
-                minY = Math.min(
-                    minY,
-                    point.y
-                );
-
-                maxX = Math.max(
-                    maxX,
-                    point.x
-                );
-
-                maxY = Math.max(
-                    maxY,
-                    point.y
-                );
-            }
-
-            return {
-                minX,
-                minY,
-                maxX,
-                maxY,
-            };
-        }
-
-        case "text":
-            return {
-                minX: element.x,
-                minY: element.y,
-                maxX:
-                    element.x +
-                    Math.max(
-                        element.text.length *
-                            10,
-                        20
-                    ),
-                maxY:
-                    element.y + 24,
-            };
-
-        case "note":
-            return {
-                minX: element.x,
-                minY: element.y,
-                maxX:
-                    element.x +
-                    element.width,
-                maxY:
-                    element.y +
-                    element.height,
-            };
-    }
-}
-
-
-function drawSelection(
-    ctx: CanvasRenderingContext2D,
-    element: CanvasElement
-) {
-    const bounds =
-        getBounds(element);
-
-    const padding = 6;
-
-    ctx.save();
-
-    ctx.strokeStyle =
-        "#625DF5";
-
-    ctx.lineWidth = 1;
-
-    ctx.setLineDash([
-        5,
-        4,
-    ]);
-
-    ctx.strokeRect(
-        bounds.minX - padding,
-        bounds.minY - padding,
-        bounds.maxX -
-            bounds.minX +
-            padding * 2,
-        bounds.maxY -
-            bounds.minY +
-            padding * 2
-    );
-
-    ctx.setLineDash([]);
-
-    ctx.fillStyle =
-        "#625DF5";
-
-    const handleSize = 6;
-
-    const handles = [
-        {
-            x:
-                bounds.minX -
-                padding,
-            y:
-                bounds.minY -
-                padding,
-        },
-        {
-            x:
-                bounds.maxX +
-                padding,
-            y:
-                bounds.minY -
-                padding,
-        },
-        {
-            x:
-                bounds.minX -
-                padding,
-            y:
-                bounds.maxY +
-                padding,
-        },
-        {
-            x:
-                bounds.maxX +
-                padding,
-            y:
-                bounds.maxY +
-                padding,
-        },
-    ];
-
-    for (const handle of handles) {
-        ctx.beginPath();
-
-        ctx.arc(
-            handle.x,
-            handle.y,
-            handleSize / 2,
-            0,
-            Math.PI * 2
-        );
-
-        ctx.fill();
-    }
-
-    ctx.restore();
 }
