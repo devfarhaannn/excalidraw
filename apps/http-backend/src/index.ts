@@ -178,6 +178,7 @@ app.get("/rooms", middleware, async (req, res) => {
                 slug: true,
                 adminId: true,
                 createdAt: true,
+                starred: true,
             },
             orderBy: {
                 id: "desc",
