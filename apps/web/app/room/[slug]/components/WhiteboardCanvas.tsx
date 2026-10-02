@@ -12,11 +12,15 @@ import { useWhiteboard } from "../hooks/useWhiteBoard";
 
 import { renderCanvas } from "../lib/canvas/renderCanvas";
 
-import type { ToolId } from "../types/whiteboard";
+import type {
+    ToolId,
+} from "../types/whiteboard";
 
 type WhiteboardCanvasProps = {
     zoom: number;
-    onZoomChange: (zoom: number) => void;
+    onZoomChange: (
+        zoom: number
+    ) => void;
     background: string;
     dark: boolean;
     activeTool: ToolId;
@@ -30,36 +34,42 @@ export default function WhiteboardCanvas({
     activeTool,
 }: WhiteboardCanvasProps) {
     const containerRef =
-        useRef<HTMLDivElement | null>(null);
+        useRef<HTMLDivElement | null>(
+            null
+        );
 
     const canvasRef =
-        useRef<HTMLCanvasElement | null>(null);
+        useRef<HTMLCanvasElement | null>(
+            null
+        );
 
     /*
-     * Canvas pan
+     * PAN
      */
     const {
         pan,
         setPan,
         cursor,
+        spacePressed,
     } = useCanvasPan({
         containerRef,
         activeTool,
     });
 
     /*
-     * Whiteboard state
+     * WHITEBOARD STATE
      */
     const {
         elements,
         selectedId,
         addElement,
         updateElement,
+        deleteElement,
         selectElement,
     } = useWhiteboard();
 
     /*
-     * Canvas zoom
+     * ZOOM
      */
     useCanvasZoom({
         containerRef,
@@ -70,7 +80,7 @@ export default function WhiteboardCanvas({
     });
 
     /*
-     * Drawing tools
+     * DRAWING + SELECT + ERASER
      */
     const {
         handlePointerDown,
@@ -82,14 +92,15 @@ export default function WhiteboardCanvas({
         zoom,
         pan,
         elements,
-        selectedId,
         addElement,
         updateElement,
+        deleteElement,
         selectElement,
+        spacePressed,
     });
 
     /*
-     * Render canvas
+     * RENDER
      */
     useEffect(() => {
         const canvas =
@@ -125,7 +136,7 @@ export default function WhiteboardCanvas({
     ]);
 
     /*
-     * Resize canvas
+     * RESIZE
      */
     useEffect(() => {
         const canvas =
@@ -142,18 +153,20 @@ export default function WhiteboardCanvas({
         }
 
         const resizeObserver =
-            new ResizeObserver(() => {
-                renderCanvas({
-                    canvas,
-                    container,
-                    elements,
-                    selectedId,
-                    pan,
-                    zoom,
-                    background,
-                    dark,
-                });
-            });
+            new ResizeObserver(
+                () => {
+                    renderCanvas({
+                        canvas,
+                        container,
+                        elements,
+                        selectedId,
+                        pan,
+                        zoom,
+                        background,
+                        dark,
+                    });
+                }
+            );
 
         resizeObserver.observe(
             container
@@ -178,9 +191,12 @@ export default function WhiteboardCanvas({
             style={{
                 backgroundColor:
                     background,
+
                 cursor,
+
                 touchAction:
                     "none",
+
                 overscrollBehavior:
                     "none",
             }}

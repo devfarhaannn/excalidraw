@@ -21,16 +21,10 @@ type Pan = {
 
 type UseCanvasDrawingProps = {
     containerRef: RefObject<HTMLDivElement | null>;
-
     activeTool: ToolId;
-
     zoom: number;
-
     pan: Pan;
-
     elements: CanvasElement[];
-
-    selectedId: number | null;
 
     addElement: (
         element: CanvasElement
@@ -43,9 +37,15 @@ type UseCanvasDrawingProps = {
         ) => CanvasElement
     ) => void;
 
+    deleteElement: (
+        id: number
+    ) => void;
+
     selectElement: (
         id: number | null
     ) => void;
+
+    spacePressed: boolean;
 };
 
 type DrawingState =
@@ -54,8 +54,13 @@ type DrawingState =
       }
     | {
           active: true;
+          mode:
+              | "draw"
+              | "move"
+              | "erase";
           elementId: number;
           tool: ToolId;
+          lastWorld: Point;
       };
 
 export function useCanvasDrawing({
@@ -66,12 +71,15 @@ export function useCanvasDrawing({
     elements,
     addElement,
     updateElement,
+    deleteElement,
     selectElement,
+    spacePressed,
 }: UseCanvasDrawingProps) {
     const drawingRef =
         useRef<DrawingState>({
             active: false,
         });
+
 
 
     function screenToWorld(
@@ -110,7 +118,11 @@ export function useCanvasDrawing({
         };
     }
 
-
+    /*
+     * ------------------------------------------
+     * CREATE ID
+     * ------------------------------------------
+     */
 
     function createId() {
         return (
@@ -120,6 +132,8 @@ export function useCanvasDrawing({
             )
         );
     }
+
+
 
     function isShapeTool(
         tool: ToolId
@@ -143,16 +157,15 @@ export function useCanvasDrawing({
         event: ReactPointerEvent<HTMLDivElement>
     ) {
         /*
-         * Only left mouse button
-         * creates/selects objects.
+         * Middle mouse and right mouse are not
+         * drawing actions.
          */
         if (event.button !== 0) {
             return;
         }
 
         /*
-         * Hand and lock are handled
-         * by the pan layer / future lock logic.
+         * Hand / Lock are handled elsewhere.
          */
         if (
             activeTool === "hand" ||
@@ -161,13 +174,19 @@ export function useCanvasDrawing({
             return;
         }
 
+        /*
+         * Space temporarily turns the canvas
+         * into pan mode.
+         */
+        if (spacePressed) {
+            return;
+        }
+
         const world =
             screenToWorld(
                 event.clientX,
                 event.clientY
             );
-
-
 
         if (
             activeTool === "select"
@@ -178,14 +197,36 @@ export function useCanvasDrawing({
                     elements
                 );
 
+            /*
+             * Click empty canvas.
+             */
             if (!selected) {
                 selectElement(null);
                 return;
             }
 
+            /*
+             * Select object.
+             */
             selectElement(
                 selected.id
             );
+
+            /*
+             * Start moving selected object.
+             */
+            event.currentTarget.setPointerCapture(
+                event.pointerId
+            );
+
+            drawingRef.current = {
+                active: true,
+                mode: "move",
+                elementId:
+                    selected.id,
+                tool: "select",
+                lastWorld: world,
+            };
 
             return;
         }
@@ -194,13 +235,41 @@ export function useCanvasDrawing({
         if (
             activeTool === "eraser"
         ) {
+            const selected =
+                hitTest(
+                    world,
+                    elements
+                );
+
+            if (!selected) {
+                return;
+            }
+
             /*
-             * Eraser movement/removal will
-             * be completed after selection.
+             * Delete immediately.
              */
+            deleteElement(
+                selected.id
+            );
+
+            /*
+             * Continue erasing while dragging.
+             */
+            event.currentTarget.setPointerCapture(
+                event.pointerId
+            );
+
+            drawingRef.current = {
+                active: true,
+                mode: "erase",
+                elementId:
+                    selected.id,
+                tool: "eraser",
+                lastWorld: world,
+            };
+
             return;
         }
-
 
 
         if (
@@ -228,6 +297,7 @@ export function useCanvasDrawing({
 
             return;
         }
+
 
         if (
             activeTool === "note"
@@ -258,6 +328,7 @@ export function useCanvasDrawing({
         }
 
 
+
         if (
             activeTool === "draw"
         ) {
@@ -271,8 +342,10 @@ export function useCanvasDrawing({
 
             drawingRef.current = {
                 active: true,
+                mode: "draw",
                 elementId: id,
                 tool: "draw",
+                lastWorld: world,
             };
 
             event.currentTarget.setPointerCapture(
@@ -300,8 +373,10 @@ export function useCanvasDrawing({
 
             drawingRef.current = {
                 active: true,
+                mode: "draw",
                 elementId: id,
                 tool: activeTool,
+                lastWorld: world,
             };
 
             event.currentTarget.setPointerCapture(
@@ -309,7 +384,6 @@ export function useCanvasDrawing({
             );
         }
     }
-
 
 
     function handlePointerMove(
@@ -327,6 +401,125 @@ export function useCanvasDrawing({
                 event.clientX,
                 event.clientY
             );
+
+
+        if (
+            drawing.mode === "move"
+        ) {
+            const deltaX =
+                world.x -
+                drawing.lastWorld.x;
+
+            const deltaY =
+                world.y -
+                drawing.lastWorld.y;
+
+            if (
+                deltaX === 0 &&
+                deltaY === 0
+            ) {
+                return;
+            }
+
+            updateElement(
+                drawing.elementId,
+                (element) => {
+                    switch (
+                        element.type
+                    ) {
+                        case "rectangle":
+                        case "diamond":
+                        case "ellipse":
+                        case "line":
+                        case "arrow":
+                            return {
+                                ...element,
+                                x1:
+                                    element.x1 +
+                                    deltaX,
+                                y1:
+                                    element.y1 +
+                                    deltaY,
+                                x2:
+                                    element.x2 +
+                                    deltaX,
+                                y2:
+                                    element.y2 +
+                                    deltaY,
+                            };
+
+                        case "draw":
+                            return {
+                                ...element,
+                                points:
+                                    element.points.map(
+                                        (
+                                            point
+                                        ) => ({
+                                            x:
+                                                point.x +
+                                                deltaX,
+                                            y:
+                                                point.y +
+                                                deltaY,
+                                        })
+                                    ),
+                            };
+
+                        case "text":
+                            return {
+                                ...element,
+                                x:
+                                    element.x +
+                                    deltaX,
+                                y:
+                                    element.y +
+                                    deltaY,
+                            };
+
+                        case "note":
+                            return {
+                                ...element,
+                                x:
+                                    element.x +
+                                    deltaX,
+                                y:
+                                    element.y +
+                                    deltaY,
+                            };
+
+                        default:
+                            return element;
+                    }
+                }
+            );
+
+            drawing.lastWorld =
+                world;
+
+            return;
+        }
+
+        if (
+            drawing.mode === "erase"
+        ) {
+            const target =
+                hitTest(
+                    world,
+                    elements
+                );
+
+            if (target) {
+                deleteElement(
+                    target.id
+                );
+            }
+
+            drawing.lastWorld =
+                world;
+
+            return;
+        }
 
 
         if (
@@ -352,9 +545,17 @@ export function useCanvasDrawing({
                 }
             );
 
+            drawing.lastWorld =
+                world;
+
             return;
         }
 
+        /*
+         * --------------------------------------
+         * SHAPES
+         * --------------------------------------
+         */
 
         if (
             isShapeTool(
@@ -383,8 +584,12 @@ export function useCanvasDrawing({
                     }
                 }
             );
+
+            drawing.lastWorld =
+                world;
         }
     }
+
 
 
     function handlePointerUp(
@@ -411,7 +616,6 @@ export function useCanvasDrawing({
             active: false,
         };
     }
-
 
     return {
         handlePointerDown,
