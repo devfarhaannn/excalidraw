@@ -26,6 +26,14 @@ export type TextEditingTarget = {
     fontSize: number;
     elementId: number | null;
 };
+export type NoteEditingTarget = {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    text: string;
+    elementId: number | null;
+};
 
 type UseCanvasDrawingProps = {
     containerRef: RefObject<HTMLDivElement | null>;
@@ -64,6 +72,10 @@ type UseCanvasDrawingProps = {
     onStartTextEditing: (
         target: TextEditingTarget
     ) => void;
+
+    onStartNoteEditing: (
+        target: NoteEditingTarget
+    ) => void;
 };
 
 type DrawingState =
@@ -73,9 +85,9 @@ type DrawingState =
     | {
         active: true;
         mode:
-            | "draw"
-            | "move"
-            | "erase";
+        | "draw"
+        | "move"
+        | "erase";
         elementId: number;
         tool: ToolId;
         lastWorld: Point;
@@ -96,6 +108,7 @@ export function useCanvasDrawing({
     commitHistory,
     spacePressed,
     onStartTextEditing,
+    onStartNoteEditing,
 }: UseCanvasDrawingProps) {
     const drawingRef =
         useRef<DrawingState>({
@@ -245,6 +258,22 @@ export function useCanvasDrawing({
 
                 return;
             }
+            if (
+                selected.type === "note" &&
+                event.detail === 2
+            ) {
+                onStartNoteEditing({
+                    x: selected.x,
+                    y: selected.y,
+                    width: selected.width,
+                    height: selected.height,
+                    text: selected.text,
+                    elementId:
+                        selected.id,
+                });
+
+                return;
+            }
 
             /*
              * Begin moving selected object.
@@ -336,26 +365,13 @@ export function useCanvasDrawing({
         if (
             activeTool === "note"
         ) {
-            const text =
-                window.prompt(
-                    "Enter note"
-                );
-
-            if (
-                !text ||
-                !text.trim()
-            ) {
-                return;
-            }
-
-            addElement({
-                id: createId(),
-                type: "note",
+            onStartNoteEditing({
                 x: world.x,
                 y: world.y,
                 width: 180,
                 height: 120,
-                text: text.trim(),
+                text: "",
+                elementId: null,
             });
 
             return;
@@ -460,7 +476,7 @@ export function useCanvasDrawing({
                 drawing.elementId,
                 (element) => {
                     switch (
-                        element.type
+                    element.type
                     ) {
                         case "rectangle":
                         case "diamond":
@@ -587,11 +603,6 @@ export function useCanvasDrawing({
             return;
         }
 
-        /*
-         * ------------------------------------------
-         * SHAPE DRAWING
-         * ------------------------------------------
-         */
         if (
             isShapeTool(
                 drawing.tool
@@ -601,7 +612,7 @@ export function useCanvasDrawing({
                 drawing.elementId,
                 (element) => {
                     switch (
-                        element.type
+                    element.type
                     ) {
                         case "rectangle":
                         case "diamond":

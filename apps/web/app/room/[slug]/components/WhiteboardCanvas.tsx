@@ -14,6 +14,7 @@ import {
 import {
     useCanvasDrawing,
     type TextEditingTarget,
+    type NoteEditingTarget,
 } from "../hooks/useCanvasDrawing";
 
 import {
@@ -34,6 +35,7 @@ import {
 
 import SelectionOverlay from "./SelectionOverlay";
 import TextEditorOverlay from "./TextEditorOverlay";
+import NoteEditorOverlay from "./NoteEditorOverlay";
 
 import type {
     ToolId,
@@ -89,6 +91,12 @@ export default function WhiteboardCanvas({
         textEditor,
         setTextEditor,
     ] = useState<TextEditingTarget | null>(
+        null
+    );
+    const [
+        noteEditor,
+        setNoteEditor,
+    ] = useState<NoteEditingTarget | null>(
         null
     );
 
@@ -193,6 +201,108 @@ export default function WhiteboardCanvas({
         setTextEditor(null);
     }
 
+    function startNoteEditing(
+        target: NoteEditingTarget
+    ) {
+        setNoteEditor(target);
+    }
+
+    function updateNoteEditor(
+        value: string
+    ) {
+        setNoteEditor((current) => {
+            if (!current) {
+                return null;
+            }
+
+            return {
+                ...current,
+                text: value,
+            };
+        });
+    }
+
+    function commitNoteEditing() {
+        if (!noteEditor) {
+            return;
+        }
+
+        const value =
+            noteEditor.text.trim();
+
+        /*
+         * Empty note = cancel
+         */
+        if (!value) {
+            setNoteEditor(null);
+            return;
+        }
+
+        /*
+         * New note
+         */
+        if (
+            noteEditor.elementId === null
+        ) {
+            addElement({
+                id:
+                    Date.now() +
+                    Math.floor(
+                        Math.random() * 1000
+                    ),
+
+                type: "note",
+
+                x: noteEditor.x,
+
+                y: noteEditor.y,
+
+                width:
+                    noteEditor.width,
+
+                height:
+                    noteEditor.height,
+
+                text: value,
+            });
+        }
+
+        /*
+         * Edit existing note
+         */
+        else {
+            const beforeElements =
+                beginHistory();
+
+            updateElement(
+                noteEditor.elementId,
+                (current) => {
+                    if (
+                        current.type !==
+                        "note"
+                    ) {
+                        return current;
+                    }
+
+                    return {
+                        ...current,
+                        text: value,
+                    };
+                }
+            );
+
+            commitHistory(
+                beforeElements
+            );
+        }
+
+        setNoteEditor(null);
+    }
+
+    function cancelNoteEditing() {
+        setNoteEditor(null);
+    }
+
     const {
         pan,
         setPan,
@@ -234,7 +344,11 @@ export default function WhiteboardCanvas({
 
         onStartTextEditing:
             startTextEditing,
+        onStartNoteEditing:
+            startNoteEditing,
     });
+
+
 
     /*
      * ------------------------------------------
@@ -416,10 +530,10 @@ export default function WhiteboardCanvas({
         selectedId === null
             ? null
             : elements.find(
-                  (element) =>
-                      element.id ===
-                      selectedId
-              );
+                (element) =>
+                    element.id ===
+                    selectedId
+            );
 
     return (
         <div
@@ -570,6 +684,28 @@ export default function WhiteboardCanvas({
                     }
                     onCancel={
                         cancelTextEditing
+                    }
+                />
+            )}
+
+            {noteEditor && (
+                <NoteEditorOverlay
+                    x={noteEditor.x}
+                    y={noteEditor.y}
+                    width={noteEditor.width}
+                    height={noteEditor.height}
+                    text={noteEditor.text}
+                    zoom={zoom}
+                    pan={pan}
+                    dark={dark}
+                    onChange={
+                        updateNoteEditor
+                    }
+                    onCommit={
+                        commitNoteEditing
+                    }
+                    onCancel={
+                        cancelNoteEditing
                     }
                 />
             )}
