@@ -20,6 +20,7 @@ model Room {
   id        Int      @id @default(autoincrement())
   slug      String   @unique
   createdAt DateTime @default(now())
+  starred   Boolean  @default(false)
   adminId   String
   chats     Chat[]
   admin     User     @relation(fields: [adminId], references: [id])

@@ -430,7 +430,7 @@ export default function DashboardPage() {
             ) => ({
                 id: room.id,
                 name: room.slug,
-                updated: new Date(room.createdAt).toLocaleDateString(),
+                updated: getRelativeTime(room.createdAt),
                 collaborators: 1,
                 starred: false,
                 shared: false,
@@ -560,6 +560,46 @@ export default function DashboardPage() {
         setCreateModalOpen(true);
     }
 
+    async function handleToggleStar(boardId: number) {
+        const token = localStorage.getItem("token");
+
+        if (!token) {
+            return;
+        }
+
+        try {
+            const response = await fetch(
+                `${BACKEND_URL}/room/${boardId}/star`,
+                {
+                    method: "PATCH",
+                    headers: {
+                        Authorization: token,
+                    },
+                }
+            );
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                console.error("Failed to update star:", data);
+                return;
+            }
+
+            setBoards((prevBoards) =>
+                prevBoards.map((board) =>
+                    board.id === boardId
+                        ? {
+                            ...board,
+                            starred: data.room.starred,
+                        }
+                        : board
+                )
+            );
+        } catch (error) {
+            console.error("Failed to toggle star:", error);
+        }
+    }
+
     async function handleSubmitCreateBoard() {
         setCreateBoardError("");
         const title = boardTitle.trim();
@@ -631,6 +671,27 @@ export default function DashboardPage() {
         setCreateBoardError("");
     }
 
+    function getRelativeTime(dateString: string) {
+        const diff = Date.now() - new Date(dateString).getTime();
+
+        const minutes = Math.floor(diff / (1000 * 60));
+
+        if (minutes < 1) return "now";
+
+        if (minutes < 60) {
+            return `${minutes}m`;
+        }
+
+        const hours = Math.floor(minutes / 60);
+
+        if (hours < 24) {
+            return `${hours}h`;
+        }
+
+        const days = Math.floor(hours / 24);
+
+        return `${days}d`;
+    }
 
 
     if (checkingAuth) {
@@ -1285,7 +1346,7 @@ export default function DashboardPage() {
 
                                     <StatCard
                                         label="Recent activity"
-                                        value="2h"
+                                        value={boards[0]?.updated ?? "—"}
                                         icon={<IconClock className="h-[17px] w-[17px]" />}
                                     />
                                 </section>
@@ -1335,7 +1396,7 @@ export default function DashboardPage() {
                                     </div>
 
                                     <div className="mt-6">
-                                        <BoardGrid boards={visibleBoards} />
+                                        <BoardGrid boards={visibleBoards} onToggleStar={handleToggleStar} />
                                     </div>
                                 </section>
                             </>
@@ -1429,7 +1490,7 @@ function StatCard({
 
 
 
-function BoardGrid({ boards }: { boards: Board[] }) {
+function BoardGrid({ boards, onToggleStar }: { boards: Board[], onToggleStar: (boardId: number) => void; }) {
     if (boards.length === 0) {
         return (
             <div className="rounded-2xl border border-dashed border-black/[0.09] bg-white/[0.75] py-20 text-center backdrop-blur-sm">
@@ -1451,14 +1512,14 @@ function BoardGrid({ boards }: { boards: Board[] }) {
     return (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {boards.map((board) => (
-                <BoardCard key={board.id} board={board} />
+                <BoardCard key={board.id} board={board} onToggleStar={onToggleStar} />
             ))}
         </div>
     );
 }
 
 
-function BoardCard({ board }: { board: Board }) {
+function BoardCard({ board, onToggleStar }: { board: Board, onToggleStar: (boardId: number) => void }) {
     const accent =
         board.accent === "purple"
             ? "#625DF5"
@@ -1472,11 +1533,28 @@ function BoardCard({ board }: { board: Board }) {
             <div className="relative h-[190px] overflow-hidden border-b border-black/[0.06] bg-[#f3f3f5]">
                 <BoardPreview accent={accent} />
 
-                {board.starred && (
-                    <div className="absolute left-3 top-3 flex h-7 w-7 items-center justify-center rounded-lg border border-black/[0.05] bg-white/[0.88] text-[#625DF5] shadow-sm backdrop-blur">
-                        <IconStar className="h-3.5 w-3.5" />
-                    </div>
-                )}
+                <button
+                    type="button"
+                    aria-label={
+                        board.starred
+                            ? `Unstar ${board.name}`
+                            : `Star ${board.name}`
+                    }
+                    onClick={() => onToggleStar(board.id)}
+                    className={[
+                        "absolute left-3 top-3 flex h-8 w-8 items-center justify-center rounded-lg border shadow-sm backdrop-blur transition-all duration-200",
+                        board.starred
+                            ? "border-[#625DF5]/15 bg-white/[0.92] text-[#625DF5]"
+                            : "border-black/[0.05] bg-white/[0.88] text-[#90909a] opacity-0 group-hover:opacity-100 hover:text-[#625DF5]",
+                    ].join(" ")}
+                >
+                    <IconStar
+                        className={[
+                            "h-4 w-4",
+                            board.starred ? "fill-current" : "fill-none",
+                        ].join(" ")}
+                    />
+                </button>
 
                 <button
                     type="button"

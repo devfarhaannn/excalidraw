@@ -197,7 +197,70 @@ app.get("/rooms", middleware, async (req, res) => {
         });
     }
 });
+app.patch("/room/:roomId/star", middleware, async (req, res) => {
+    const roomId = Number(req.params.roomId);
 
+    if (Number.isNaN(roomId)) {
+        return res.status(400).json({
+            success: false,
+            message: "Invalid room id",
+        });
+    }
+
+    const userId = req.userId;
+
+    if (!userId) {
+        return res.status(401).json({
+            success: false,
+            message: "Unauthorized",
+        });
+    }
+
+    try {
+        const room = await prisma.room.findFirst({
+            where: {
+                id: roomId,
+                adminId: userId,
+            },
+            select: {
+                id: true,
+                starred: true,
+            },
+        });
+
+        if (!room) {
+            return res.status(404).json({
+                success: false,
+                message: "Board not found",
+            });
+        }
+
+        const updatedRoom = await prisma.room.update({
+            where: {
+                id: room.id,
+            },
+            data: {
+                starred: !room.starred,
+            },
+            select: {
+                id: true,
+                starred: true,
+            },
+        });
+
+        return res.status(200).json({
+            success: true,
+            room: updatedRoom,
+        });
+    } catch (error) {
+        console.error("Failed to update board star:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Failed to update board",
+        });
+    }
+});
 app.get("/me", middleware, async (req, res) => {
     try {
         const user = await prisma.user.findUnique({
