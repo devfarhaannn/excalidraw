@@ -31,11 +31,6 @@ import type {
     ToolId,
 } from "../types/whiteboard";
 
-type Pan = {
-    x: number;
-    y: number;
-};
-
 type WhiteboardCanvasProps = {
     zoom: number;
     onZoomChange: (
@@ -63,15 +58,6 @@ export default function WhiteboardCanvas({
             null
         );
 
-    const {
-        pan,
-        setPan,
-        cursor,
-        spacePressed,
-    } = useCanvasPan({
-        containerRef,
-        activeTool,
-    });
 
     const {
         elements,
@@ -82,6 +68,20 @@ export default function WhiteboardCanvas({
         selectElement,
     } = useWhiteboard();
 
+
+
+    const {
+        pan,
+        setPan,
+        cursor,
+        spacePressed,
+    } = useCanvasPan({
+        containerRef,
+        activeTool,
+    });
+
+
+
     useCanvasZoom({
         containerRef,
         zoom,
@@ -90,7 +90,12 @@ export default function WhiteboardCanvas({
         onPanChange: setPan,
     });
 
-    useCanvasDrawing({
+
+    const {
+        handlePointerDown,
+        handlePointerMove,
+        handlePointerUp,
+    } = useCanvasDrawing({
         containerRef,
         activeTool,
         zoom,
@@ -102,6 +107,8 @@ export default function WhiteboardCanvas({
         selectElement,
         spacePressed,
     });
+
+
 
     useEffect(() => {
         const canvas =
@@ -133,6 +140,7 @@ export default function WhiteboardCanvas({
         background,
         dark,
     ]);
+
 
     useEffect(() => {
         const canvas =
@@ -176,6 +184,8 @@ export default function WhiteboardCanvas({
         dark,
     ]);
 
+
+
     const selectedElement =
         selectedId === null
             ? null
@@ -185,13 +195,30 @@ export default function WhiteboardCanvas({
                       selectedId
               );
 
+
     return (
         <div
             ref={containerRef}
-            className="fixed inset-0 overflow-hidden"
+            className="fixed inset-0 overflow-hidden select-none"
             style={{
                 cursor,
                 touchAction: "none",
+                overscrollBehavior: "none",
+            }}
+            onPointerDown={
+                handlePointerDown
+            }
+            onPointerMove={
+                handlePointerMove
+            }
+            onPointerUp={
+                handlePointerUp
+            }
+            onPointerCancel={
+                handlePointerUp
+            }
+            onContextMenu={(event) => {
+                event.preventDefault();
             }}
         >
             <canvas
