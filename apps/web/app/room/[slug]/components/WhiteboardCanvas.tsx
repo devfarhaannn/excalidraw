@@ -51,6 +51,7 @@ type WhiteboardCanvasProps = {
     background: string;
     dark: boolean;
     activeTool: ToolId;
+    onToolChange: (tool: ToolId) => void;
 
     onSelectionChange?: (
         element: CanvasElement | null
@@ -69,6 +70,7 @@ export default function WhiteboardCanvas({
     activeTool,
     onSelectionChange,
     onPropertyUpdaterReady,
+     onToolChange,
 }: WhiteboardCanvasProps) {
     const containerRef =
         useRef<HTMLDivElement | null>(null);
@@ -298,6 +300,7 @@ export default function WhiteboardCanvas({
 
         onStartTextEditing: startTextEditing,
         onStartNoteEditing: startNoteEditing,
+        onToolChange
     });
 
     // UNDO / REDO KEYBOARD SHORTCUTS

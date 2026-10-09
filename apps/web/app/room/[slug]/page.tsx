@@ -562,6 +562,7 @@ export default function RoomPage() {
                 onPropertyUpdaterReady={
                     handlePropertyUpdaterReady
                 }
+                onToolChange={handleToolChange}
             />
 
             {/* MENU DISMISS BACKDROP */}
@@ -939,7 +940,7 @@ export default function RoomPage() {
                         event.stopPropagation()
                     }
                     className={[
-                        "absolute left-[76px] top-16 z-40 flex max-h-[calc(100vh-7rem)] w-[min(268px,calc(100vw-92px))] flex-col overflow-hidden rounded-2xl border shadow-[0_20px_60px_rgba(20,20,30,.18)] backdrop-blur-xl",
+                        "absolute left-4 top-16 z-40 flex max-h-[calc(100vh-7rem)] w-[min(268px,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border shadow-[0_20px_60px_rgba(20,20,30,.18)] backdrop-blur-xl",
                         surfaceClass,
                     ].join(" ")}
                 >

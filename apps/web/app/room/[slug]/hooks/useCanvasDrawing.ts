@@ -41,6 +41,7 @@ type UseCanvasDrawingProps = {
     zoom: number;
     pan: Pan;
     elements: CanvasElement[];
+    onToolChange: (tool: ToolId) => void;
 
     addElement: (
         element: CanvasElement
@@ -109,6 +110,7 @@ export function useCanvasDrawing({
     spacePressed,
     onStartTextEditing,
     onStartNoteEditing,
+    onToolChange
 }: UseCanvasDrawingProps) {
     const drawingRef =
         useRef<DrawingState>({
@@ -638,47 +640,228 @@ export function useCanvasDrawing({
         }
     }
 
-    function handlePointerUp(
-        event: ReactPointerEvent<HTMLDivElement>
-    ) {
-        const drawing =
-            drawingRef.current;
+function handlePointerUp(
+    event: ReactPointerEvent<HTMLDivElement>
+) {
+    const drawing = drawingRef.current;
 
-        if (!drawing.active) {
-            return;
-        }
-
-        /*
-         * Release pointer capture.
-         */
-        if (
-            event.currentTarget.hasPointerCapture(
-                event.pointerId
-            )
-        ) {
-            event.currentTarget.releasePointerCapture(
-                event.pointerId
-            );
-        }
-
-        /*
-         * Record a single history entry
-         * for the entire move operation.
-         */
-        if (
-            drawing.beforeElements.length > 0 &&
-            (
-                drawing.mode === "move" ||
-                drawing.mode === "draw"
-            )
-        ) {
-            commitHistory(drawing.beforeElements);
-        }
-
-        drawingRef.current = {
-            active: false,
-        };
+    if (!drawing.active) {
+        return;
     }
+
+    // Always use the actual release position. Pointer movement
+    // events can be skipped when the user draws very quickly.
+    const world = screenToWorld(
+        event.clientX,
+        event.clientY
+    );
+
+    // Finish a move at the exact release position.
+    if (drawing.mode === "move") {
+        const deltaX = world.x - drawing.lastWorld.x;
+        const deltaY = world.y - drawing.lastWorld.y;
+
+        if (deltaX !== 0 || deltaY !== 0) {
+            updateElement(drawing.elementId, (element) => {
+                switch (element.type) {
+                    case "rectangle":
+                    case "diamond":
+                    case "ellipse":
+                    case "line":
+                    case "arrow":
+                        return {
+                            ...element,
+                            x1: element.x1 + deltaX,
+                            y1: element.y1 + deltaY,
+                            x2: element.x2 + deltaX,
+                            y2: element.y2 + deltaY,
+                        };
+
+                    case "draw":
+                        return {
+                            ...element,
+                            points: element.points.map((point) => ({
+                                x: point.x + deltaX,
+                                y: point.y + deltaY,
+                            })),
+                        };
+
+                    case "text":
+                        return {
+                            ...element,
+                            x: element.x + deltaX,
+                            y: element.y + deltaY,
+                        };
+
+                    case "note":
+                        return {
+                            ...element,
+                            x: element.x + deltaX,
+                            y: element.y + deltaY,
+                        };
+
+                    default:
+                        return element;
+                }
+            });
+        }
+    }
+
+    // Finalize shapes using the release position.
+    if (
+        drawing.mode === "draw" &&
+        isShapeTool(drawing.tool)
+    ) {
+        updateElement(drawing.elementId, (element) => {
+            if (
+                element.type !== "rectangle" &&
+                element.type !== "diamond" &&
+                element.type !== "ellipse" &&
+                element.type !== "line" &&
+                element.type !== "arrow"
+            ) {
+                return element;
+            }
+
+            let x2 = world.x;
+            let y2 = world.y;
+
+            const dx = x2 - element.x1;
+            const dy = y2 - element.y1;
+
+            const minSize = 12;
+
+            if (
+                element.type === "rectangle" ||
+                element.type === "diamond" ||
+                element.type === "ellipse"
+            ) {
+                // Keep quickly drawn shapes visible.
+                if (event.shiftKey) {
+                    const size = Math.max(
+                        Math.abs(dx),
+                        Math.abs(dy),
+                        minSize
+                    );
+
+                    x2 =
+                        element.x1 +
+                        Math.sign(dx || 1) * size;
+
+                    y2 =
+                        element.y1 +
+                        Math.sign(dy || 1) * size;
+                } else {
+                    if (Math.abs(dx) < minSize) {
+                        x2 =
+                            element.x1 +
+                            Math.sign(dx || 1) * minSize;
+                    }
+
+                    if (Math.abs(dy) < minSize) {
+                        y2 =
+                            element.y1 +
+                            Math.sign(dy || 1) * minSize;
+                    }
+                }
+            } else if (
+                Math.hypot(dx, dy) < minSize
+            ) {
+                // A line or arrow needs a minimum visible length.
+                x2 = element.x1 + minSize;
+                y2 = element.y1;
+            }
+
+            return {
+                ...element,
+                x2,
+                y2,
+            };
+        });
+    }
+
+    // Finish the freehand stroke at the release position too.
+    if (
+        drawing.mode === "draw" &&
+        drawing.tool === "draw"
+    ) {
+        updateElement(drawing.elementId, (element) => {
+            if (element.type !== "draw") {
+                return element;
+            }
+
+            const lastPoint =
+                element.points[element.points.length - 1];
+
+            if (
+                lastPoint &&
+                Math.hypot(
+                    world.x - lastPoint.x,
+                    world.y - lastPoint.y
+                ) < 0.25
+            ) {
+                // A quick tap should still leave a visible mark.
+                if (element.points.length > 1) {
+                    return element;
+                }
+
+                return {
+                    ...element,
+                    points: [
+                        ...element.points,
+                        {
+                            x: lastPoint.x + 1,
+                            y: lastPoint.y + 1,
+                        },
+                    ],
+                };
+            }
+
+            return {
+                ...element,
+                points: [...element.points, world],
+            };
+        });
+    }
+
+    // Release pointer capture after applying the final position.
+    if (
+        event.currentTarget.hasPointerCapture(event.pointerId)
+    ) {
+        event.currentTarget.releasePointerCapture(
+            event.pointerId
+        );
+    }
+
+    // Record one history entry for the completed operation.
+    if (
+        drawing.mode === "move" ||
+        (
+            drawing.mode === "draw" &&
+            (
+                isShapeTool(drawing.tool) ||
+                drawing.tool === "draw"
+            )
+        )
+    ) {
+        commitHistory(drawing.beforeElements);
+    }
+
+    if (
+        drawing.mode === "draw" &&
+        (
+            isShapeTool(drawing.tool) ||
+            drawing.tool === "draw"
+        )
+    ) {
+        selectElement(drawing.elementId);
+        onToolChange("select");
+    }
+
+    drawingRef.current = {
+        active: false,
+    };
+}
 
     return {
         handlePointerDown,
