@@ -544,9 +544,17 @@ export default function WhiteboardCanvas({
                 touchAction: "none",
                 overscrollBehavior: "none",
             }}
-            onPointerDown={
-                handlePointerDown
-            }
+            onPointerDown={(event) => {
+                if (noteEditor) {
+                    event.preventDefault();
+                    event.stopPropagation();
+
+                    commitNoteEditing();
+                    return;
+                }
+
+                handlePointerDown(event);
+            }}
             onPointerMove={
                 handlePointerMove
             }

@@ -381,6 +381,7 @@ export function useCanvasDrawing({
         if (
             activeTool === "draw"
         ) {
+            const beforeElements = beginHistory();
             const id =
                 createId();
 
@@ -396,7 +397,7 @@ export function useCanvasDrawing({
                 elementId: id,
                 tool: "draw",
                 lastWorld: world,
-                beforeElements: [],
+                beforeElements,
             };
 
             event.currentTarget.setPointerCapture(
@@ -410,6 +411,7 @@ export function useCanvasDrawing({
         if (
             isShapeTool(activeTool)
         ) {
+            const beforeElements = beginHistory();
             const id =
                 createId();
 
@@ -428,7 +430,7 @@ export function useCanvasDrawing({
                 elementId: id,
                 tool: activeTool,
                 lastWorld: world,
-                beforeElements: [],
+                beforeElements
             };
 
             event.currentTarget.setPointerCapture(
@@ -664,12 +666,13 @@ export function useCanvasDrawing({
          * for the entire move operation.
          */
         if (
-            drawing.mode === "move" &&
-            drawing.beforeElements.length > 0
+            drawing.beforeElements.length > 0 &&
+            (
+                drawing.mode === "move" ||
+                drawing.mode === "draw"
+            )
         ) {
-            commitHistory(
-                drawing.beforeElements
-            );
+            commitHistory(drawing.beforeElements);
         }
 
         drawingRef.current = {
