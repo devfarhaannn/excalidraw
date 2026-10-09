@@ -78,11 +78,51 @@ export function renderCanvas({
         zoom / 100
     );
 
+    const darkCanvas = isDarkCanvasBackground(
+        background,
+        dark
+    );
+
     for (const element of elements) {
-        drawElement(ctx, element, dark);
+        drawElement(ctx, element, darkCanvas);
     }
 
     ctx.restore();
+}
+
+function isDarkCanvasBackground(
+    background: string,
+    fallback: boolean
+): boolean {
+    const match = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(
+        background.trim()
+    );
+
+    const rawHex = match?.[1];
+
+    if (!rawHex) {
+        return fallback;
+    }
+
+    const hex =
+        rawHex.length === 3
+            ? rawHex
+                .split("")
+                .map((character) => character + character)
+                .join("")
+            : rawHex;
+
+    const red = Number.parseInt(hex.slice(0, 2), 16);
+    const green = Number.parseInt(hex.slice(2, 4), 16);
+    const blue = Number.parseInt(hex.slice(4, 6), 16);
+
+    const luminance =
+        (0.2126 * red +
+            0.7152 * green +
+            0.0722 * blue) /
+        255;
+
+    return luminance < 0.5;
 }
 
 function drawElement(

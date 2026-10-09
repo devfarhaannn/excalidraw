@@ -160,10 +160,14 @@ export default function RoomPage() {
     const [systemDark, setSystemDark] =
         useState(false);
 
+    /*
+     * null = use the background for the active theme.
+     * A string = the user has selected a custom canvas color.
+     */
     const [
         canvasBackground,
         setCanvasBackground,
-    ] = useState("#ffffff");
+    ] = useState<string | null>(null);
 
     const [
         menuSearchOpen,
@@ -186,14 +190,27 @@ export default function RoomPage() {
     const [preferencesLoaded, setPreferencesLoaded] =
         useState(false);
 
+    /*
+     * Resolve the active theme.
+     */
     const isDark =
         theme === "dark" ||
         (theme === "system" && systemDark);
 
     /*
+     * FIX: the default canvas background follows the active theme.
+     * A user-selected custom background is preserved instead.
+     */
+    const effectiveCanvasBackground =
+        canvasBackground ??
+        (isDark ? "#17171b" : "#ffffff");
+
+    /*
      * Load saved preferences.
-     * preferencesLoaded prevents the initial default
-     * values from overwriting the saved values.
+     *
+     * Older versions stored #ffffff as the default background.
+     * We treat that legacy default as theme-controlled so dark
+     * mode can correctly use its dark background.
      */
     useEffect(() => {
         const savedTheme =
@@ -202,6 +219,11 @@ export default function RoomPage() {
         const savedBackground =
             localStorage.getItem(
                 "draivo-canvas-background"
+            );
+
+        const savedBackgroundMode =
+            localStorage.getItem(
+                "draivo-canvas-background-mode"
             );
 
         if (
@@ -216,12 +238,31 @@ export default function RoomPage() {
             savedBackground &&
             /^#[0-9a-fA-F]{6}$/.test(savedBackground)
         ) {
-            setCanvasBackground(savedBackground);
+            const isLegacyDefaultWhite =
+                savedBackgroundMode === null &&
+                savedBackground.toLowerCase() === "#ffffff";
+
+            const hasCustomBackground =
+                savedBackgroundMode === "custom" ||
+                (
+                    savedBackgroundMode !== "theme" &&
+                    !isLegacyDefaultWhite
+                );
+
+            if (hasCustomBackground) {
+                setCanvasBackground(savedBackground);
+            }
         }
 
         setPreferencesLoaded(true);
     }, []);
 
+    /*
+     * Save the active theme.
+     *
+     * Do not save the initial default values before preferences
+     * have finished loading from localStorage.
+     */
     useEffect(() => {
         if (!preferencesLoaded) {
             return;
@@ -233,10 +274,31 @@ export default function RoomPage() {
         );
     }, [theme, preferencesLoaded]);
 
+    /*
+     * Save either a theme-controlled canvas or a custom color.
+     */
     useEffect(() => {
         if (!preferencesLoaded) {
             return;
         }
+
+        if (canvasBackground === null) {
+            localStorage.setItem(
+                "draivo-canvas-background-mode",
+                "theme"
+            );
+
+            localStorage.removeItem(
+                "draivo-canvas-background"
+            );
+
+            return;
+        }
+
+        localStorage.setItem(
+            "draivo-canvas-background-mode",
+            "custom"
+        );
 
         localStorage.setItem(
             "draivo-canvas-background",
@@ -245,7 +307,8 @@ export default function RoomPage() {
     }, [canvasBackground, preferencesLoaded]);
 
     /*
-     * Watch the system theme.
+     * Watch changes to the operating system theme.
+     * This keeps System mode up to date.
      */
     useEffect(() => {
         const mediaQuery = window.matchMedia(
@@ -272,7 +335,7 @@ export default function RoomPage() {
     }, []);
 
     /*
-     * Escape closes popovers and the command palette.
+     * Keyboard shortcuts and Escape handling.
      */
     useEffect(() => {
         function handleKeyDown(event: KeyboardEvent) {
@@ -304,30 +367,39 @@ export default function RoomPage() {
                 case "v":
                     setActiveTool("select");
                     break;
+
                 case "r":
                     setActiveTool("rectangle");
                     break;
+
                 case "d":
                     setActiveTool("diamond");
                     break;
+
                 case "o":
                     setActiveTool("ellipse");
                     break;
+
                 case "a":
                     setActiveTool("arrow");
                     break;
+
                 case "l":
                     setActiveTool("line");
                     break;
+
                 case "p":
                     setActiveTool("draw");
                     break;
+
                 case "t":
                     setActiveTool("text");
                     break;
+
                 case "n":
                     setActiveTool("note");
                     break;
+
                 case "e":
                     setActiveTool("eraser");
                     break;
@@ -370,9 +442,13 @@ export default function RoomPage() {
     function handleResetCanvas() {
         setZoom(100);
         setActiveTool("select");
-        setCanvasBackground("#ffffff");
+
+        // Return to the active theme's default background.
+        setCanvasBackground(null);
+
         setLocked(false);
         setMenuOpen(false);
+        setMenuSearchOpen(false);
         setPropertiesOpen(false);
     }
 
@@ -383,12 +459,16 @@ export default function RoomPage() {
     }
 
     function handleThemeChange(nextTheme: ThemeMode) {
-        setTheme(nextTheme);
-    }
+    // Reset the custom background so the canvas follows
+    // the newly selected theme.
+    setCanvasBackground(null);
+    setTheme(nextTheme);
+}
 
     /*
-     * Send selection from WhiteboardCanvas to this page.
-     * Automatically open the floating panel for a selection.
+     * Receive selection changes from WhiteboardCanvas.
+     * Open the contextual properties panel when an element
+     * is selected.
      */
     const handleSelectionChange = useCallback(
         (element: CanvasElement | null) => {
@@ -402,7 +482,7 @@ export default function RoomPage() {
     );
 
     /*
-     * WhiteboardCanvas exposes the property updater.
+     * Receive the updater used by the properties panel.
      */
     const handlePropertyUpdaterReady = useCallback(
         (updater: ElementPropertyUpdater) => {
@@ -412,7 +492,7 @@ export default function RoomPage() {
     );
 
     /*
-     * Change a property on the currently selected element.
+     * Apply changes to the selected canvas element.
      */
     function updateSelectedElementProperties(
         patch: ElementStylePatch
@@ -499,7 +579,7 @@ export default function RoomPage() {
             <WhiteboardCanvas
                 zoom={zoom}
                 onZoomChange={setZoom}
-                background={canvasBackground}
+                background={effectiveCanvasBackground}
                 dark={isDark}
                 activeTool={activeTool}
                 onSelectionChange={handleSelectionChange}
@@ -784,31 +864,39 @@ export default function RoomPage() {
                             </p>
 
                             <div className="mt-2 flex items-center gap-2 px-1">
-                                {CANVAS_BACKGROUNDS.map((color) => (
-                                    <button
-                                        key={color}
-                                        type="button"
-                                        title={`Canvas ${color}`}
-                                        aria-label={`Canvas background ${color}`}
-                                        aria-pressed={
-                                            canvasBackground === color
-                                        }
-                                        onClick={() =>
-                                            setCanvasBackground(color)
-                                        }
-                                        className={[
-                                            "h-7 w-7 rounded-lg border shadow-sm transition-all hover:scale-105",
-                                            canvasBackground === color
-                                                ? "border-[#625DF5] ring-2 ring-[#625DF5]/20"
-                                                : isDark
-                                                    ? "border-white/10"
-                                                    : "border-black/[0.08]",
-                                        ].join(" ")}
-                                        style={{
-                                            backgroundColor: color,
-                                        }}
-                                    />
-                                ))}
+                                {CANVAS_BACKGROUNDS.map((color) => {
+                                    const isActive =
+                                        canvasBackground === color ||
+                                        (
+                                            canvasBackground === null &&
+                                            effectiveCanvasBackground.toLowerCase() ===
+                                                color.toLowerCase()
+                                        );
+
+                                    return (
+                                        <button
+                                            key={color}
+                                            type="button"
+                                            title={`Canvas ${color}`}
+                                            aria-label={`Canvas background ${color}`}
+                                            aria-pressed={isActive}
+                                            onClick={() =>
+                                                setCanvasBackground(color)
+                                            }
+                                            className={[
+                                                "h-7 w-7 rounded-lg border shadow-sm transition-all hover:scale-105",
+                                                isActive
+                                                    ? "border-[#625DF5] ring-2 ring-[#625DF5]/20"
+                                                    : isDark
+                                                        ? "border-white/10"
+                                                        : "border-black/[0.08]",
+                                            ].join(" ")}
+                                            style={{
+                                                backgroundColor: color,
+                                            }}
+                                        />
+                                    );
+                                })}
                             </div>
                         </div>
 
@@ -1330,7 +1418,7 @@ export default function RoomPage() {
                                         <input
                                             type="color"
                                             aria-label="Custom canvas background"
-                                            value={canvasBackground}
+                                            value={effectiveCanvasBackground}
                                             onChange={(event) =>
                                                 setCanvasBackground(
                                                     event.currentTarget.value
@@ -1342,7 +1430,7 @@ export default function RoomPage() {
                                         <input
                                             type="text"
                                             aria-label="Canvas HEX color"
-                                            value={canvasBackground}
+                                            value={effectiveCanvasBackground}
                                             onChange={(event) => {
                                                 const value =
                                                     event.currentTarget.value;
@@ -1361,31 +1449,39 @@ export default function RoomPage() {
                                     </div>
 
                                     <div className="mt-3 grid grid-cols-6 gap-2">
-                                        {CANVAS_BACKGROUNDS.map((color) => (
-                                            <button
-                                                key={color}
-                                                type="button"
-                                                title={color}
-                                                aria-label={`Set canvas background to ${color}`}
-                                                aria-pressed={
-                                                    canvasBackground === color
-                                                }
-                                                onClick={() =>
-                                                    setCanvasBackground(color)
-                                                }
-                                                className={[
-                                                    "h-8 w-full rounded-lg border transition-transform hover:scale-105",
-                                                    canvasBackground === color
-                                                        ? "border-[#625DF5] ring-2 ring-[#625DF5]/25"
-                                                        : isDark
-                                                            ? "border-white/10"
-                                                            : "border-black/[0.08]",
-                                                ].join(" ")}
-                                                style={{
-                                                    backgroundColor: color,
-                                                }}
-                                            />
-                                        ))}
+                                        {CANVAS_BACKGROUNDS.map((color) => {
+                                            const isActive =
+                                                canvasBackground === color ||
+                                                (
+                                                    canvasBackground === null &&
+                                                    effectiveCanvasBackground.toLowerCase() ===
+                                                        color.toLowerCase()
+                                                );
+
+                                            return (
+                                                <button
+                                                    key={color}
+                                                    type="button"
+                                                    title={color}
+                                                    aria-label={`Set canvas background to ${color}`}
+                                                    aria-pressed={isActive}
+                                                    onClick={() =>
+                                                        setCanvasBackground(color)
+                                                    }
+                                                    className={[
+                                                        "h-8 w-full rounded-lg border transition-transform hover:scale-105",
+                                                        isActive
+                                                            ? "border-[#625DF5] ring-2 ring-[#625DF5]/25"
+                                                            : isDark
+                                                                ? "border-white/10"
+                                                                : "border-black/[0.08]",
+                                                    ].join(" ")}
+                                                    style={{
+                                                        backgroundColor: color,
+                                                    }}
+                                                />
+                                            );
+                                        })}
                                     </div>
                                 </section>
                             </>
