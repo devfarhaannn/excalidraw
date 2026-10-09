@@ -2,6 +2,7 @@
 
 import {
     useRef,
+    type MouseEvent as ReactMouseEvent,
     type PointerEvent as ReactPointerEvent,
     type RefObject,
 } from "react";
@@ -214,6 +215,58 @@ export function useCanvasDrawing({
                 ) / scale,
         };
     }
+    function handleDoubleClick(
+        event: ReactMouseEvent<HTMLDivElement>
+    ) {
+        if (
+            activeTool !== "select" ||
+            spacePressed ||
+            event.button !== 0
+        ) {
+            return;
+        }
+
+        const world = screenToWorld(
+            event.clientX,
+            event.clientY
+        );
+
+        const selected = hitTest(world, elements);
+
+        if (!selected) {
+            return;
+        }
+
+        // Prevent the double-click from leaving a drag active.
+        drawingRef.current = {
+            active: false,
+        };
+
+        selectElement(selected.id);
+
+        if (selected.type === "note") {
+            onStartNoteEditing({
+                x: selected.x,
+                y: selected.y,
+                width: selected.width,
+                height: selected.height,
+                text: selected.text,
+                elementId: selected.id,
+            });
+
+            return;
+        }
+
+        if (selected.type === "text") {
+            onStartTextEditing({
+                x: selected.x,
+                y: selected.y,
+                text: selected.text,
+                fontSize: selected.fontSize ?? 20,
+                elementId: selected.id,
+            });
+        }
+    }
 
     function releasePointer(
         event: ReactPointerEvent<HTMLDivElement>
@@ -254,70 +307,70 @@ export function useCanvasDrawing({
         );
 
         // SELECT AND MOVE
-        if (activeTool === "select") {
-            const selected = hitTest(world, elements);
+        // if (activeTool === "select") {
+        //     const selected = hitTest(world, elements);
 
-            if (!selected) {
-                selectElement(null);
-                return;
-            }
+        //     if (!selected) {
+        //         selectElement(null);
+        //         return;
+        //     }
 
-            selectElement(selected.id);
+        //     selectElement(selected.id);
 
-            if (
-                selected.type === "text" &&
-                event.detail === 2
-            ) {
-                drawingRef.current = {
-                    active: false,
-                };
+        //     if (
+        //         selected.type === "text" &&
+        //         event.detail === 2
+        //     ) {
+        //         drawingRef.current = {
+        //             active: false,
+        //         };
 
-                onStartTextEditing({
-                    x: selected.x,
-                    y: selected.y,
-                    text: selected.text,
-                    fontSize: selected.fontSize ?? 20,
-                    elementId: selected.id,
-                });
+        //         onStartTextEditing({
+        //             x: selected.x,
+        //             y: selected.y,
+        //             text: selected.text,
+        //             fontSize: selected.fontSize ?? 20,
+        //             elementId: selected.id,
+        //         });
 
-                return;
-            }
+        //         return;
+        //     }
 
-            if (
-                selected.type === "note" &&
-                event.detail === 2
-            ) {
-                drawingRef.current = {
-                    active: false,
-                };
+        //     if (
+        //         selected.type === "note" &&
+        //         event.detail === 2
+        //     ) {
+        //         drawingRef.current = {
+        //             active: false,
+        //         };
 
-                onStartNoteEditing({
-                    x: selected.x,
-                    y: selected.y,
-                    width: selected.width,
-                    height: selected.height,
-                    text: selected.text,
-                    elementId: selected.id,
-                });
+        //         onStartNoteEditing({
+        //             x: selected.x,
+        //             y: selected.y,
+        //             width: selected.width,
+        //             height: selected.height,
+        //             text: selected.text,
+        //             elementId: selected.id,
+        //         });
 
-                return;
-            }
+        //         return;
+        //     }
 
-            event.currentTarget.setPointerCapture(
-                event.pointerId
-            );
+        //     event.currentTarget.setPointerCapture(
+        //         event.pointerId
+        //     );
 
-            drawingRef.current = {
-                active: true,
-                mode: "move",
-                elementId: selected.id,
-                tool: "select",
-                lastWorld: world,
-                beforeElements: beginHistory(),
-            };
+        //     drawingRef.current = {
+        //         active: true,
+        //         mode: "move",
+        //         elementId: selected.id,
+        //         tool: "select",
+        //         lastWorld: world,
+        //         beforeElements: beginHistory(),
+        //     };
 
-            return;
-        }
+        //     return;
+        // }
 
         // ERASER
         if (activeTool === "eraser") {
@@ -881,5 +934,6 @@ export function useCanvasDrawing({
         handlePointerDown,
         handlePointerMove,
         handlePointerUp,
+        handleDoubleClick
     };
 }

@@ -18,7 +18,7 @@ type RenderCanvasOptions = {
 export function renderCanvas({
     canvas,
     container,
-    elements,
+    elements: elementsForRender,
     pan,
     zoom,
     background,
@@ -83,7 +83,7 @@ export function renderCanvas({
         dark
     );
 
-    for (const element of elements) {
+    for (const element of elementsForRender) {
         drawElement(ctx, element, darkCanvas);
     }
 

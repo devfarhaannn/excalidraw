@@ -5,7 +5,9 @@ import {
     useEffect,
     useRef,
     useState,
+    useMemo,
     type PointerEvent as ReactPointerEvent,
+    type MouseEvent as ReactMouseEvent,
 } from "react";
 
 import {
@@ -280,6 +282,7 @@ export default function WhiteboardCanvas({
         handlePointerDown,
         handlePointerMove,
         handlePointerUp,
+        handleDoubleClick
     } = useCanvasDrawing({
         containerRef,
         activeTool,
@@ -482,6 +485,41 @@ export default function WhiteboardCanvas({
         };
     }, [undo, redo]);
 
+    // Hide the saved text underneath the editor while editing.
+    // The textarea displays the current text instead, so it
+    // won't appear twice on the canvas.
+    const elementsForRender = useMemo(
+        () =>
+            elements.map((element) => {
+                if (
+                    noteEditor?.elementId === element.id &&
+                    element.type === "note"
+                ) {
+                    return {
+                        ...element,
+                        text: "",
+                    };
+                }
+
+                if (
+                    textEditor?.elementId === element.id &&
+                    element.type === "text"
+                ) {
+                    return {
+                        ...element,
+                        text: "",
+                    };
+                }
+
+                return element;
+            }),
+        [
+            elements,
+            noteEditor?.elementId,
+            textEditor?.elementId,
+        ]
+    );
+
     // RENDER CANVAS
 
     useEffect(() => {
@@ -495,11 +533,12 @@ export default function WhiteboardCanvas({
         renderCanvas({
             canvas,
             container,
-            elements,
+            elements: elementsForRender,
             pan,
             zoom,
             background,
             dark,
+            
         });
     }, [
         elements,
@@ -507,6 +546,7 @@ export default function WhiteboardCanvas({
         zoom,
         background,
         dark,
+        elementsForRender
     ]);
 
     // REDRAW WHEN THE CANVAS CONTAINER RESIZES
@@ -595,6 +635,20 @@ export default function WhiteboardCanvas({
         onPropertyUpdaterReady,
         updateElementProperties,
     ]);
+    function handleCanvasDoubleClick(
+        event: ReactMouseEvent<HTMLDivElement>
+    ) {
+        // Only respond to double-clicks on the canvas itself.
+        if (event.target !== canvasRef.current) {
+            return;
+        }
+
+        if (noteEditor || textEditor) {
+            return;
+        }
+
+        handleDoubleClick(event);
+    }
 
     return (
         <div
@@ -616,6 +670,7 @@ export default function WhiteboardCanvas({
             onContextMenu={(event) => {
                 event.preventDefault();
             }}
+            onDoubleClick={handleCanvasDoubleClick}
         >
             <canvas
                 ref={canvasRef}
