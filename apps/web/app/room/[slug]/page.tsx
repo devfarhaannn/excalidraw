@@ -3,11 +3,13 @@
 import {
     ArrowUpRight,
     Command,
+    ChevronDown,
+    Moon,
+    Monitor,
     Download,
     FileImage,
     FolderOpen,
     HelpCircle,
-    Languages,
     Link2,
     Lock,
     Menu,
@@ -48,13 +50,22 @@ import type {
     ToolId,
 } from "./types/whiteboard";
 
-const CANVAS_BACKGROUNDS = [
+const LIGHT_CANVAS_BACKGROUNDS = [
     "#ffffff",
     "#f5f5f5",
     "#f4f7ff",
     "#fff9df",
     "#fff3ef",
     "#eefbf5",
+];
+
+const DARK_CANVAS_BACKGROUNDS = [
+    "#111111",
+    "#181818",
+    "#151a1d",
+    "#252309",
+    "#211b1b",
+    "#303030",
 ];
 
 const ELEMENT_COLORS = [
@@ -88,7 +99,7 @@ function MenuItem({
             type="button"
             onClick={onClick}
             className={[
-                "flex h-9 w-full items-center gap-3 rounded-lg px-2.5 text-left text-[12px] transition-colors",
+                "flex h-8 w-full items-center gap-2.5 rounded-md px-2 text-left text-[12px] transition-colors",
                 isDark
                     ? "text-white/75 hover:bg-white/[0.07]"
                     : "text-[#46464f] hover:bg-[#f5f4fa]",
@@ -160,10 +171,7 @@ export default function RoomPage() {
     const [systemDark, setSystemDark] =
         useState(false);
 
-    /*
-     * null = use the background for the active theme.
-     * A string = the user has selected a custom canvas color.
-     */
+    // null means that the canvas follows the active theme.
     const [
         canvasBackground,
         setCanvasBackground,
@@ -190,27 +198,20 @@ export default function RoomPage() {
     const [preferencesLoaded, setPreferencesLoaded] =
         useState(false);
 
-    /*
-     * Resolve the active theme.
-     */
     const isDark =
         theme === "dark" ||
         (theme === "system" && systemDark);
 
-    /*
-     * FIX: the default canvas background follows the active theme.
-     * A user-selected custom background is preserved instead.
-     */
     const effectiveCanvasBackground =
         canvasBackground ??
-        (isDark ? "#17171b" : "#ffffff");
+        (isDark ? "#111111" : "#ffffff");
+
+    const canvasBackgroundOptions = isDark
+        ? DARK_CANVAS_BACKGROUNDS
+        : LIGHT_CANVAS_BACKGROUNDS;
 
     /*
      * Load saved preferences.
-     *
-     * Older versions stored #ffffff as the default background.
-     * We treat that legacy default as theme-controlled so dark
-     * mode can correctly use its dark background.
      */
     useEffect(() => {
         const savedTheme =
@@ -258,10 +259,7 @@ export default function RoomPage() {
     }, []);
 
     /*
-     * Save the active theme.
-     *
-     * Do not save the initial default values before preferences
-     * have finished loading from localStorage.
+     * Save the selected theme.
      */
     useEffect(() => {
         if (!preferencesLoaded) {
@@ -275,7 +273,7 @@ export default function RoomPage() {
     }, [theme, preferencesLoaded]);
 
     /*
-     * Save either a theme-controlled canvas or a custom color.
+     * Save custom background preferences.
      */
     useEffect(() => {
         if (!preferencesLoaded) {
@@ -307,8 +305,7 @@ export default function RoomPage() {
     }, [canvasBackground, preferencesLoaded]);
 
     /*
-     * Watch changes to the operating system theme.
-     * This keeps System mode up to date.
+     * Track the operating system theme.
      */
     useEffect(() => {
         const mediaQuery = window.matchMedia(
@@ -335,7 +332,7 @@ export default function RoomPage() {
     }, []);
 
     /*
-     * Keyboard shortcuts and Escape handling.
+     * Keyboard shortcuts.
      */
     useEffect(() => {
         function handleKeyDown(event: KeyboardEvent) {
@@ -367,39 +364,30 @@ export default function RoomPage() {
                 case "v":
                     setActiveTool("select");
                     break;
-
                 case "r":
                     setActiveTool("rectangle");
                     break;
-
                 case "d":
                     setActiveTool("diamond");
                     break;
-
                 case "o":
                     setActiveTool("ellipse");
                     break;
-
                 case "a":
                     setActiveTool("arrow");
                     break;
-
                 case "l":
                     setActiveTool("line");
                     break;
-
                 case "p":
                     setActiveTool("draw");
                     break;
-
                 case "t":
                     setActiveTool("text");
                     break;
-
                 case "n":
                     setActiveTool("note");
                     break;
-
                 case "e":
                     setActiveTool("eraser");
                     break;
@@ -419,7 +407,7 @@ export default function RoomPage() {
         };
     }, []);
 
-    // ZOOM
+    // Zoom controls
 
     function zoomIn() {
         setZoom((value) =>
@@ -437,15 +425,12 @@ export default function RoomPage() {
         setZoom(100);
     }
 
-    // CANVAS / TOOL ACTIONS
+    // Canvas and tool actions
 
     function handleResetCanvas() {
         setZoom(100);
         setActiveTool("select");
-
-        // Return to the active theme's default background.
         setCanvasBackground(null);
-
         setLocked(false);
         setMenuOpen(false);
         setMenuSearchOpen(false);
@@ -459,16 +444,12 @@ export default function RoomPage() {
     }
 
     function handleThemeChange(nextTheme: ThemeMode) {
-    // Reset the custom background so the canvas follows
-    // the newly selected theme.
-    setCanvasBackground(null);
-    setTheme(nextTheme);
-}
+        setCanvasBackground(null);
+        setTheme(nextTheme);
+    }
 
     /*
-     * Receive selection changes from WhiteboardCanvas.
-     * Open the contextual properties panel when an element
-     * is selected.
+     * Keep the selected element synchronized with the canvas.
      */
     const handleSelectionChange = useCallback(
         (element: CanvasElement | null) => {
@@ -481,9 +462,6 @@ export default function RoomPage() {
         []
     );
 
-    /*
-     * Receive the updater used by the properties panel.
-     */
     const handlePropertyUpdaterReady = useCallback(
         (updater: ElementPropertyUpdater) => {
             propertyUpdaterRef.current = updater;
@@ -491,9 +469,6 @@ export default function RoomPage() {
         []
     );
 
-    /*
-     * Apply changes to the selected canvas element.
-     */
     function updateSelectedElementProperties(
         patch: ElementStylePatch
     ) {
@@ -576,6 +551,7 @@ export default function RoomPage() {
             ].join(" ")}
         >
             {/* CANVAS */}
+
             <WhiteboardCanvas
                 zoom={zoom}
                 onZoomChange={setZoom}
@@ -589,6 +565,7 @@ export default function RoomPage() {
             />
 
             {/* MENU DISMISS BACKDROP */}
+
             {menuOpen && (
                 <button
                     type="button"
@@ -601,7 +578,8 @@ export default function RoomPage() {
                 />
             )}
 
-            {/* TOP LEFT: MENU AND ROOM NAME */}
+            {/* TOP LEFT MENU */}
+
             <div className="absolute left-4 top-4 z-50">
                 <div className="flex items-center">
                     <button
@@ -633,43 +611,18 @@ export default function RoomPage() {
                     </div>
                 </div>
 
-                {/* APP MENU */}
+                {/* SIDEBAR MENU */}
+
                 {menuOpen && (
                     <div
                         onClick={(event) =>
                             event.stopPropagation()
                         }
                         className={[
-                            "absolute left-0 top-12 w-[270px] overflow-hidden rounded-2xl border p-2 shadow-[0_24px_70px_rgba(20,20,30,.20)] backdrop-blur-2xl",
+                            "absolute left-0 top-12 w-[240px] overflow-hidden rounded-xl border p-1.5 shadow-[0_24px_70px_rgba(20,20,30,.20)] backdrop-blur-2xl",
                             surfaceClass,
                         ].join(" ")}
                     >
-                        {/* Room heading */}
-                        <div className="px-2.5 py-2">
-                            <div className="flex items-center gap-2.5">
-                                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#625DF5] text-xs font-semibold text-white">
-                                    D
-                                </div>
-
-                                <div className="min-w-0">
-                                    <p
-                                        className={[
-                                            "text-[10px] font-semibold uppercase tracking-[0.16em]",
-                                            mutedTextClass,
-                                        ].join(" ")}
-                                    >
-                                        Draivo
-                                    </p>
-
-                                    <p className="mt-0.5 truncate text-[12px] font-medium">
-                                        {slug}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <Divider isDark={isDark} />
-
                         <MenuItem
                             icon={FolderOpen}
                             title="Open"
@@ -787,26 +740,16 @@ export default function RoomPage() {
                             }}
                         />
 
-                        {/* Theme settings */}
-                        <div className="px-2.5 py-2">
-                            <div className="flex items-center gap-3">
-                                <span
-                                    className={[
-                                        "flex h-7 w-7 items-center justify-center",
-                                        mutedTextClass,
-                                    ].join(" ")}
-                                >
-                                    <Palette className="h-4 w-4" />
-                                </span>
+                        {/* COMPACT THEME SELECTOR */}
 
-                                <span className="text-[12px]">
-                                    Theme
-                                </span>
-                            </div>
+                        <div className="flex items-center justify-between gap-2 px-2.5 py-2">
+                            <span className="text-[12px]">
+                                Theme
+                            </span>
 
                             <div
                                 className={[
-                                    "mt-1.5 grid grid-cols-3 gap-1 rounded-lg border p-1",
+                                    "flex items-center gap-0.5 rounded-lg border p-1",
                                     isDark
                                         ? "border-white/10 bg-white/[0.04]"
                                         : "border-black/[0.06] bg-[#f7f7f9]",
@@ -822,38 +765,58 @@ export default function RoomPage() {
                                     <button
                                         key={mode}
                                         type="button"
-                                        title={mode}
+                                        title={`${mode} theme`}
+                                        aria-label={`Use ${mode} theme`}
                                         aria-pressed={theme === mode}
                                         onClick={() =>
                                             handleThemeChange(mode)
                                         }
                                         className={[
-                                            "flex h-8 items-center justify-center rounded-md text-[11px] capitalize transition-colors",
+                                            "flex h-7 w-8 items-center justify-center rounded-md transition-colors",
                                             theme === mode
                                                 ? "bg-[#625DF5] text-white shadow-sm"
                                                 : isDark
-                                                    ? "text-white/50 hover:bg-white/[0.06]"
+                                                    ? "text-white/55 hover:bg-white/[0.07]"
                                                     : "text-[#777781] hover:bg-white",
                                         ].join(" ")}
                                     >
                                         {mode === "light" ? (
-                                            <Sun className="mr-1 h-3.5 w-3.5" />
+                                            <Sun className="h-3.5 w-3.5" />
                                         ) : mode === "dark" ? (
-                                            <span className="mr-1">◐</span>
+                                            <Moon className="h-3.5 w-3.5" />
                                         ) : (
-                                            <span className="mr-1">▣</span>
+                                            <Monitor className="h-3.5 w-3.5" />
                                         )}
-
-                                        {mode === "system"
-                                            ? "System"
-                                            : mode}
                                     </button>
                                 ))}
                             </div>
                         </div>
 
-                        {/* Canvas background presets */}
-                        <div className="px-2.5 pb-2 pt-2">
+                        {/* LANGUAGE */}
+
+                        <button
+                            type="button"
+                            onClick={() => setMenuOpen(false)}
+                            className={[
+                                "mx-1.5 flex h-9 w-[calc(100%-12px)] items-center justify-between rounded-lg border px-3 text-left text-[12px] transition-colors",
+                                isDark
+                                    ? "border-white/10 bg-white/[0.03] text-white/75 hover:bg-white/[0.06]"
+                                    : "border-black/[0.07] bg-white text-[#45454d] hover:bg-[#f8f8fb]",
+                            ].join(" ")}
+                        >
+                            <span>English</span>
+
+                            <ChevronDown
+                                className={[
+                                    "h-3.5 w-3.5",
+                                    mutedTextClass,
+                                ].join(" ")}
+                            />
+                        </button>
+
+                        {/* CANVAS BACKGROUND PRESETS */}
+
+                        <div className="px-2.5 pb-2 pt-3">
                             <p
                                 className={[
                                     "px-1 text-[11px] font-medium",
@@ -863,8 +826,8 @@ export default function RoomPage() {
                                 Canvas background
                             </p>
 
-                            <div className="mt-2 flex items-center gap-2 px-1">
-                                {CANVAS_BACKGROUNDS.map((color) => {
+                            <div className="mt-2 flex items-center justify-between gap-1 px-1">
+                                {canvasBackgroundOptions.map((color) => {
                                     const isActive =
                                         canvasBackground === color ||
                                         (
@@ -878,15 +841,15 @@ export default function RoomPage() {
                                             key={color}
                                             type="button"
                                             title={`Canvas ${color}`}
-                                            aria-label={`Canvas background ${color}`}
+                                            aria-label={`Set canvas background to ${color}`}
                                             aria-pressed={isActive}
                                             onClick={() =>
                                                 setCanvasBackground(color)
                                             }
                                             className={[
-                                                "h-7 w-7 rounded-lg border shadow-sm transition-all hover:scale-105",
+                                                "h-7 w-7 shrink-0 rounded-lg border transition-all hover:scale-105",
                                                 isActive
-                                                    ? "border-[#625DF5] ring-2 ring-[#625DF5]/20"
+                                                    ? "border-[#625DF5] ring-2 ring-[#625DF5]/25"
                                                     : isDark
                                                         ? "border-white/10"
                                                         : "border-black/[0.08]",
@@ -899,19 +862,12 @@ export default function RoomPage() {
                                 })}
                             </div>
                         </div>
-
-                        <MenuItem
-                            icon={Languages}
-                            title="English"
-                            shortcut="›"
-                            isDark={isDark}
-                            onClick={() => setMenuOpen(false)}
-                        />
                     </div>
                 )}
             </div>
 
             {/* DRAWING TOOLBAR */}
+
             <WhiteboardToolbar
                 activeTool={activeTool}
                 isDark={isDark}
@@ -919,6 +875,7 @@ export default function RoomPage() {
             />
 
             {/* TOP RIGHT ACTIONS */}
+
             <div className="absolute right-4 top-4 z-30 flex items-center gap-2">
                 <button
                     type="button"
@@ -971,6 +928,7 @@ export default function RoomPage() {
             </div>
 
             {/* FLOATING CONTEXTUAL PROPERTIES PANEL */}
+
             {propertiesOpen && (
                 <aside
                     aria-label="Properties panel"
@@ -985,7 +943,6 @@ export default function RoomPage() {
                         surfaceClass,
                     ].join(" ")}
                 >
-                    {/* Header */}
                     <div
                         className={[
                             "flex items-center justify-between border-b px-4 py-3",
@@ -1034,6 +991,7 @@ export default function RoomPage() {
                         {selectedElement ? (
                             <>
                                 {/* STROKE COLOR */}
+
                                 {selectedCanHaveStroke && (
                                     <section>
                                         <p className="text-xs font-medium">
@@ -1105,6 +1063,7 @@ export default function RoomPage() {
                                 )}
 
                                 {/* FILL / NOTE BACKGROUND */}
+
                                 {selectedCanFill && (
                                     <section>
                                         <p className="text-xs font-medium">
@@ -1197,6 +1156,7 @@ export default function RoomPage() {
                                 )}
 
                                 {/* TEXT COLOR */}
+
                                 {selectedCanHaveTextColor && (
                                     <section>
                                         <p className="text-xs font-medium">
@@ -1243,6 +1203,7 @@ export default function RoomPage() {
                                 )}
 
                                 {/* STROKE WIDTH */}
+
                                 {selectedCanHaveStroke && (
                                     <section>
                                         <div className="flex items-center justify-between">
@@ -1284,6 +1245,7 @@ export default function RoomPage() {
                                 )}
 
                                 {/* FONT SIZE */}
+
                                 {selectedElement.type === "text" && (
                                     <section>
                                         <div className="flex items-center justify-between">
@@ -1325,6 +1287,7 @@ export default function RoomPage() {
                                 )}
 
                                 {/* OPACITY */}
+
                                 <section>
                                     <div className="flex items-center justify-between">
                                         <label
@@ -1365,7 +1328,8 @@ export default function RoomPage() {
                             </>
                         ) : (
                             <>
-                                {/* THEME SETTINGS */}
+                                {/* APPEARANCE SETTINGS */}
+
                                 <section>
                                     <p className="text-xs font-semibold">
                                         Appearance
@@ -1408,7 +1372,8 @@ export default function RoomPage() {
                                     </div>
                                 </section>
 
-                                {/* CANVAS BACKGROUND */}
+                                {/* CANVAS BACKGROUND SETTINGS */}
+
                                 <section>
                                     <p className="text-xs font-semibold">
                                         Canvas background
@@ -1449,7 +1414,7 @@ export default function RoomPage() {
                                     </div>
 
                                     <div className="mt-3 grid grid-cols-6 gap-2">
-                                        {CANVAS_BACKGROUNDS.map((color) => {
+                                        {canvasBackgroundOptions.map((color) => {
                                             const isActive =
                                                 canvasBackground === color ||
                                                 (
@@ -1491,6 +1456,7 @@ export default function RoomPage() {
             )}
 
             {/* ZOOM CONTROLS */}
+
             <div
                 className={[
                     "absolute bottom-4 left-1/2 z-30 flex -translate-x-1/2 items-center rounded-xl border p-1 shadow-[0_8px_30px_rgba(20,20,30,.08)] backdrop-blur-xl",
@@ -1545,6 +1511,7 @@ export default function RoomPage() {
             </div>
 
             {/* LOCK / HELP */}
+
             <div className="absolute bottom-4 right-4 z-30 flex items-center gap-2">
                 <button
                     type="button"
@@ -1580,6 +1547,7 @@ export default function RoomPage() {
             </div>
 
             {/* COMMAND PALETTE */}
+
             {menuSearchOpen && (
                 <div
                     className="fixed inset-0 z-[70] flex items-start justify-center bg-black/20 px-4 pt-[18vh] backdrop-blur-[2px]"
