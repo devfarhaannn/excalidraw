@@ -70,7 +70,7 @@ export default function WhiteboardCanvas({
     activeTool,
     onSelectionChange,
     onPropertyUpdaterReady,
-     onToolChange,
+    onToolChange,
 }: WhiteboardCanvasProps) {
     const containerRef =
         useRef<HTMLDivElement | null>(null);
@@ -209,17 +209,18 @@ export default function WhiteboardCanvas({
 
         const value = noteEditor.text.trim();
 
-        if (!value) {
-            setNoteEditor(null);
-            return;
-        }
+        const beforeElements = beginHistory();
 
-        // Create a new note.
-        if (noteEditor.elementId === null) {
+        const isNewNote =
+            noteEditor.elementId === null;
+
+        const noteId = isNewNote
+            ? Date.now() + Math.floor(Math.random() * 1000)
+            : noteEditor.elementId!;
+
+        if (isNewNote) {
             addElement({
-                id:
-                    Date.now() +
-                    Math.floor(Math.random() * 1000),
+                id: noteId,
                 type: "note",
                 x: noteEditor.x,
                 y: noteEditor.y,
@@ -228,11 +229,8 @@ export default function WhiteboardCanvas({
                 text: value,
             });
         } else {
-            // Update existing note and record history.
-            const beforeElements = beginHistory();
-
             updateElement(
-                noteEditor.elementId,
+                noteId,
                 (current) => {
                     if (current.type !== "note") {
                         return current;
@@ -244,11 +242,16 @@ export default function WhiteboardCanvas({
                     };
                 }
             );
-
-            commitHistory(beforeElements);
         }
 
+        commitHistory(beforeElements);
+
+        selectElement(noteId);
+
         setNoteEditor(null);
+
+        // Return to selection after creating or editing a note.
+        onToolChange("select");
     }
 
     function cancelNoteEditing() {
@@ -499,15 +502,23 @@ export default function WhiteboardCanvas({
                 overscrollBehavior: "none",
             }}
             onPointerDown={(event) => {
-                /*
-                 * Finish the note editor on outside click.
-                 * Do not send the same click back to the
-                 * drawing handler, or a new note could open.
-                 */
+                // Ignore clicks on editor overlays, handles and toolbar controls.
+                // Only a direct canvas click should finish an active editor.
+                if (event.target !== canvasRef.current) {
+                    return;
+                }
+
                 if (noteEditor) {
                     event.preventDefault();
                     event.stopPropagation();
                     commitNoteEditing();
+                    return;
+                }
+
+                if (textEditor) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    commitTextEditing();
                     return;
                 }
 

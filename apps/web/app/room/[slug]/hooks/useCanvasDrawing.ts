@@ -649,99 +649,105 @@ function handlePointerUp(
         return;
     }
 
-    // Always use the actual release position. Pointer movement
-    // events can be skipped when the user draws very quickly.
     const world = screenToWorld(
         event.clientX,
         event.clientY
     );
 
-    // Finish a move at the exact release position.
+    /*
+     * Apply the final movement to a selected element.
+     */
     if (drawing.mode === "move") {
         const deltaX = world.x - drawing.lastWorld.x;
         const deltaY = world.y - drawing.lastWorld.y;
 
         if (deltaX !== 0 || deltaY !== 0) {
-            updateElement(drawing.elementId, (element) => {
-                switch (element.type) {
-                    case "rectangle":
-                    case "diamond":
-                    case "ellipse":
-                    case "line":
-                    case "arrow":
-                        return {
-                            ...element,
-                            x1: element.x1 + deltaX,
-                            y1: element.y1 + deltaY,
-                            x2: element.x2 + deltaX,
-                            y2: element.y2 + deltaY,
-                        };
+            updateElement(
+                drawing.elementId,
+                (element) => {
+                    switch (element.type) {
+                        case "rectangle":
+                        case "diamond":
+                        case "ellipse":
+                        case "line":
+                        case "arrow":
+                            return {
+                                ...element,
+                                x1: element.x1 + deltaX,
+                                y1: element.y1 + deltaY,
+                                x2: element.x2 + deltaX,
+                                y2: element.y2 + deltaY,
+                            };
 
-                    case "draw":
-                        return {
-                            ...element,
-                            points: element.points.map((point) => ({
-                                x: point.x + deltaX,
-                                y: point.y + deltaY,
-                            })),
-                        };
+                        case "draw":
+                            return {
+                                ...element,
+                                points: element.points.map(
+                                    (point) => ({
+                                        x: point.x + deltaX,
+                                        y: point.y + deltaY,
+                                    })
+                                ),
+                            };
 
-                    case "text":
-                        return {
-                            ...element,
-                            x: element.x + deltaX,
-                            y: element.y + deltaY,
-                        };
+                        case "text":
+                            return {
+                                ...element,
+                                x: element.x + deltaX,
+                                y: element.y + deltaY,
+                            };
 
-                    case "note":
-                        return {
-                            ...element,
-                            x: element.x + deltaX,
-                            y: element.y + deltaY,
-                        };
-
-                    default:
-                        return element;
+                        case "note":
+                            return {
+                                ...element,
+                                x: element.x + deltaX,
+                                y: element.y + deltaY,
+                            };
+                    }
                 }
-            });
+            );
         }
     }
 
-    // Finalize shapes using the release position.
+    /*
+     * Finalize the shape at the exact release position.
+     */
     if (
         drawing.mode === "draw" &&
         isShapeTool(drawing.tool)
     ) {
-        updateElement(drawing.elementId, (element) => {
-            if (
-                element.type !== "rectangle" &&
-                element.type !== "diamond" &&
-                element.type !== "ellipse" &&
-                element.type !== "line" &&
-                element.type !== "arrow"
-            ) {
-                return element;
-            }
+        updateElement(
+            drawing.elementId,
+            (element) => {
+                if (
+                    element.type !== "rectangle" &&
+                    element.type !== "diamond" &&
+                    element.type !== "ellipse" &&
+                    element.type !== "line" &&
+                    element.type !== "arrow"
+                ) {
+                    return element;
+                }
 
-            let x2 = world.x;
-            let y2 = world.y;
+                let x2 = world.x;
+                let y2 = world.y;
 
-            const dx = x2 - element.x1;
-            const dy = y2 - element.y1;
+                const dx = x2 - element.x1;
+                const dy = y2 - element.y1;
 
-            const minSize = 12;
+                const isAreaShape =
+                    element.type === "rectangle" ||
+                    element.type === "diamond" ||
+                    element.type === "ellipse";
 
-            if (
-                element.type === "rectangle" ||
-                element.type === "diamond" ||
-                element.type === "ellipse"
-            ) {
-                // Keep quickly drawn shapes visible.
-                if (event.shiftKey) {
+                if (
+                    event.shiftKey &&
+                    isAreaShape
+                ) {
                     const size = Math.max(
                         Math.abs(dx),
                         Math.abs(dy),
-                        minSize
+                        12
                     );
 
                     x2 =
@@ -751,57 +757,52 @@ function handlePointerUp(
                     y2 =
                         element.y1 +
                         Math.sign(dy || 1) * size;
-                } else {
-                    if (Math.abs(dx) < minSize) {
-                        x2 =
-                            element.x1 +
-                            Math.sign(dx || 1) * minSize;
-                    }
-
-                    if (Math.abs(dy) < minSize) {
-                        y2 =
-                            element.y1 +
-                            Math.sign(dy || 1) * minSize;
+                } else if (
+                    Math.hypot(dx, dy) < 2
+                ) {
+                    // A rapid click must still produce a visible shape.
+                    if (isAreaShape) {
+                        x2 = element.x1 + 12;
+                        y2 = element.y1 + 12;
+                    } else {
+                        x2 = element.x1 + 12;
+                        y2 = element.y1;
                     }
                 }
-            } else if (
-                Math.hypot(dx, dy) < minSize
-            ) {
-                // A line or arrow needs a minimum visible length.
-                x2 = element.x1 + minSize;
-                y2 = element.y1;
-            }
 
-            return {
-                ...element,
-                x2,
-                y2,
-            };
-        });
+                return {
+                    ...element,
+                    x2,
+                    y2,
+                };
+            }
+        );
     }
 
-    // Finish the freehand stroke at the release position too.
+    /*
+     * Finish the freehand line at pointer release.
+     */
     if (
         drawing.mode === "draw" &&
         drawing.tool === "draw"
     ) {
-        updateElement(drawing.elementId, (element) => {
-            if (element.type !== "draw") {
-                return element;
-            }
+        updateElement(
+            drawing.elementId,
+            (element) => {
+                if (element.type !== "draw") {
+                    return element;
+                }
 
-            const lastPoint =
-                element.points[element.points.length - 1];
+                const last =
+                    element.points[element.points.length - 1];
 
-            if (
-                lastPoint &&
-                Math.hypot(
-                    world.x - lastPoint.x,
-                    world.y - lastPoint.y
-                ) < 0.25
-            ) {
-                // A quick tap should still leave a visible mark.
-                if (element.points.length > 1) {
+                if (
+                    last &&
+                    Math.hypot(
+                        world.x - last.x,
+                        world.y - last.y
+                    ) < 0.25
+                ) {
                     return element;
                 }
 
@@ -809,31 +810,23 @@ function handlePointerUp(
                     ...element,
                     points: [
                         ...element.points,
-                        {
-                            x: lastPoint.x + 1,
-                            y: lastPoint.y + 1,
-                        },
+                        world,
                     ],
                 };
             }
-
-            return {
-                ...element,
-                points: [...element.points, world],
-            };
-        });
+        );
     }
 
-    // Release pointer capture after applying the final position.
     if (
-        event.currentTarget.hasPointerCapture(event.pointerId)
+        event.currentTarget.hasPointerCapture(
+            event.pointerId
+        )
     ) {
         event.currentTarget.releasePointerCapture(
             event.pointerId
         );
     }
 
-    // Record one history entry for the completed operation.
     if (
         drawing.mode === "move" ||
         (
@@ -847,12 +840,14 @@ function handlePointerUp(
         commitHistory(drawing.beforeElements);
     }
 
+    /*
+     * After finishing a shape, switch to Select.
+     * The next click can then select/move the shape
+     * instead of starting another one.
+     */
     if (
         drawing.mode === "draw" &&
-        (
-            isShapeTool(drawing.tool) ||
-            drawing.tool === "draw"
-        )
+        isShapeTool(drawing.tool)
     ) {
         selectElement(drawing.elementId);
         onToolChange("select");
