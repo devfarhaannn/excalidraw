@@ -4,6 +4,7 @@ import {
     useEffect,
     useRef,
     type KeyboardEvent as ReactKeyboardEvent,
+    type PointerEvent as ReactPointerEvent,
 } from "react";
 
 type Pan = {
@@ -20,13 +21,8 @@ type NoteEditorOverlayProps = {
     zoom: number;
     pan: Pan;
     dark: boolean;
-
-    onChange: (
-        value: string
-    ) => void;
-
+    onChange: (value: string) => void;
     onCommit: () => void;
-
     onCancel: () => void;
 };
 
@@ -44,13 +40,10 @@ export default function NoteEditorOverlay({
     onCancel,
 }: NoteEditorOverlayProps) {
     const textareaRef =
-        useRef<HTMLTextAreaElement | null>(
-            null
-        );
+        useRef<HTMLTextAreaElement | null>(null);
 
     useEffect(() => {
-        const textarea =
-            textareaRef.current;
+        const textarea = textareaRef.current;
 
         if (!textarea) {
             return;
@@ -64,22 +57,27 @@ export default function NoteEditorOverlay({
         );
     }, []);
 
+    const scale = Math.max(zoom / 100, 0.01);
+
+    const left =
+        `calc(50% + ${pan.x + x * scale}px)`;
+
+    const top =
+        `calc(50% + ${pan.y + y * scale}px)`;
+
     function handleKeyDown(
         event: ReactKeyboardEvent<HTMLTextAreaElement>
     ) {
-        /*
-         * Escape = cancel
-         */
+        event.stopPropagation();
+
         if (event.key === "Escape") {
             event.preventDefault();
             onCancel();
             return;
         }
 
-        /*
-         * Cmd + Enter = save on Mac
-         * Ctrl + Enter = save on Windows/Linux
-         */
+        // Enter creates a new line.
+        // Cmd/Ctrl + Enter saves the note.
         if (
             event.key === "Enter" &&
             (event.metaKey || event.ctrlKey)
@@ -89,57 +87,54 @@ export default function NoteEditorOverlay({
         }
     }
 
-    const scale =
-        zoom / 100;
-
-    const left =
-        `calc(50% + ${
-            pan.x + x * scale
-        }px)`;
-
-    const top =
-        `calc(50% + ${
-            pan.y + y * scale
-        }px)`;
+    function stopPointer(
+        event: ReactPointerEvent<HTMLTextAreaElement>
+    ) {
+        event.stopPropagation();
+    }
 
     return (
         <textarea
             ref={textareaRef}
+            autoFocus
             value={text}
-            onChange={(event) =>
-                onChange(
-                    event.target.value
-                )
-            }
-            onKeyDown={
-                handleKeyDown
-            }
-            onPointerDown={(event) =>
-                event.stopPropagation()
-            }
-            onPointerMove={(event) =>
-                event.stopPropagation()
-            }
-            onPointerUp={(event) =>
-                event.stopPropagation()
-            }
+            spellCheck={false}
+            aria-label="Edit note"
             placeholder="Write a note..."
+            onChange={(event) =>
+                onChange(event.currentTarget.value)
+            }
+            onKeyDown={handleKeyDown}
+            onPointerDown={stopPointer}
+            onPointerMove={stopPointer}
+            onPointerUp={stopPointer}
+            onClick={(event) =>
+                event.stopPropagation()
+            }
             className={[
-                "absolute z-50 resize-none rounded-xl border px-4 py-3 text-sm leading-6 outline-none",
-                "shadow-[0_12px_35px_rgba(20,20,30,.16)]",
-                dark
-                    ? "border-[#625DF5] bg-[#2d2b21] text-white placeholder:text-white/30"
-                    : "border-[#d9c86a] bg-[#fff7bf] text-[#27272a] placeholder:text-black/35",
+                "absolute z-[60] resize-none",
+                "m-0 border-0 bg-transparent outline-none",
+                "ring-0",
             ].join(" ")}
             style={{
                 left,
                 top,
-                width:
-                    width * scale,
-                height:
-                    height * scale,
-                fontFamily:
-                    "Inter, Arial, sans-serif",
+                width: `${Math.max(width, 80) * scale}px`,
+                height: `${Math.max(height, 60) * scale}px`,
+                boxSizing: "border-box",
+                padding: `${12 * scale}px`,
+                fontFamily: "Inter, Arial, sans-serif",
+                fontSize: `${14 * scale}px`,
+                lineHeight: `${20 * scale}px`,
+                color: "#403d2e",
+                caretColor: "#625DF5",
+                background: "transparent",
+                border: "none",
+                outline: "none",
+                whiteSpace: "pre-wrap",
+                overflowWrap: "break-word",
+                overflow: "auto",
+                zIndex: 60,
             }}
         />
     );

@@ -5,6 +5,7 @@ import {
     useEffect,
     useRef,
     useState,
+    type PointerEvent as ReactPointerEvent,
 } from "react";
 
 import {
@@ -18,21 +19,10 @@ import {
     type NoteEditingTarget,
 } from "../hooks/useCanvasDrawing";
 
-import {
-    useCanvasPan,
-} from "../hooks/useCanvasPan";
-
-import {
-    useCanvasZoom,
-} from "../hooks/useCanvasZoom";
-
-import {
-    useWhiteboard,
-} from "../hooks/useWhiteBoard";
-
-import {
-    renderCanvas,
-} from "../lib/canvas/renderCanvas";
+import { useCanvasPan } from "../hooks/useCanvasPan";
+import { useCanvasZoom } from "../hooks/useCanvasZoom";
+import { useWhiteboard } from "../hooks/useWhiteBoard";
+import { renderCanvas } from "../lib/canvas/renderCanvas";
 
 import SelectionOverlay from "./SelectionOverlay";
 import TextEditorOverlay from "./TextEditorOverlay";
@@ -68,9 +58,9 @@ export default function WhiteboardCanvas({
     background,
     dark,
     activeTool,
+    onToolChange,
     onSelectionChange,
     onPropertyUpdaterReady,
-    onToolChange,
 }: WhiteboardCanvasProps) {
     const containerRef =
         useRef<HTMLDivElement | null>(null);
@@ -81,18 +71,14 @@ export default function WhiteboardCanvas({
     const {
         elements,
         selectedId,
-
         addElement,
         updateElement,
         deleteElement,
         selectElement,
-
         beginHistory,
         commitHistory,
-
         undo,
         redo,
-
         canUndo,
         canRedo,
     } = useWhiteboard();
@@ -112,6 +98,7 @@ export default function WhiteboardCanvas({
     function startTextEditing(
         target: TextEditingTarget
     ) {
+        setNoteEditor(null);
         setTextEditor(target);
     }
 
@@ -140,20 +127,22 @@ export default function WhiteboardCanvas({
             return;
         }
 
-        // Create new text.
         if (textEditor.elementId === null) {
+            const id =
+                Date.now() +
+                Math.floor(Math.random() * 1000);
+
             addElement({
-                id:
-                    Date.now() +
-                    Math.floor(Math.random() * 1000),
+                id,
                 type: "text",
                 x: textEditor.x,
                 y: textEditor.y,
                 text: value,
                 fontSize: textEditor.fontSize,
             });
+
+            selectElement(id);
         } else {
-            // Update existing text and record history.
             const beforeElements = beginHistory();
 
             updateElement(
@@ -175,6 +164,7 @@ export default function WhiteboardCanvas({
         }
 
         setTextEditor(null);
+        onToolChange("select");
     }
 
     function cancelTextEditing() {
@@ -186,6 +176,7 @@ export default function WhiteboardCanvas({
     function startNoteEditing(
         target: NoteEditingTarget
     ) {
+        setTextEditor(null);
         setNoteEditor(target);
     }
 
@@ -208,7 +199,6 @@ export default function WhiteboardCanvas({
         }
 
         const value = noteEditor.text.trim();
-
         const beforeElements = beginHistory();
 
         const isNewNote =
@@ -247,10 +237,7 @@ export default function WhiteboardCanvas({
         commitHistory(beforeElements);
 
         selectElement(noteId);
-
         setNoteEditor(null);
-
-        // Return to selection after creating or editing a note.
         onToolChange("select");
     }
 
@@ -269,6 +256,15 @@ export default function WhiteboardCanvas({
         containerRef,
         activeTool,
     });
+
+    const handPanRef = useRef<{
+        pointerId: number;
+        lastX: number;
+        lastY: number;
+    } | null>(null);
+
+    const [isHandDragging, setIsHandDragging] =
+        useState(false);
 
     useCanvasZoom({
         containerRef,
@@ -290,21 +286,139 @@ export default function WhiteboardCanvas({
         zoom,
         pan,
         elements,
-
         addElement,
         updateElement,
         deleteElement,
         selectElement,
-
         beginHistory,
         commitHistory,
-
         spacePressed,
-
         onStartTextEditing: startTextEditing,
         onStartNoteEditing: startNoteEditing,
-        onToolChange
+        onToolChange,
     });
+
+    // POINTER HANDLERS
+
+    function handleCanvasPointerDown(
+        event: ReactPointerEvent<HTMLDivElement>
+    ) {
+        const target = event.target as HTMLElement;
+
+        const isCanvasSurface =
+            target === canvasRef.current ||
+            target === containerRef.current;
+
+        // Ignore events originating from editor overlays
+        // and other UI elements.
+        if (!isCanvasSurface) {
+            return;
+        }
+
+        // Clicking the canvas while editing commits the editor.
+        // The same click must not start another drawing action.
+        if (noteEditor) {
+            event.preventDefault();
+            event.stopPropagation();
+            commitNoteEditing();
+            return;
+        }
+
+        if (textEditor) {
+            event.preventDefault();
+            event.stopPropagation();
+            commitTextEditing();
+            return;
+        }
+
+        // Pan with the Hand tool, Space+drag, or middle mouse.
+        const shouldPan =
+            event.button === 1 ||
+            (
+                event.button === 0 &&
+                (
+                    activeTool === "hand" ||
+                    spacePressed
+                )
+            );
+
+        if (shouldPan) {
+            event.preventDefault();
+
+            handPanRef.current = {
+                pointerId: event.pointerId,
+                lastX: event.clientX,
+                lastY: event.clientY,
+            };
+
+            event.currentTarget.setPointerCapture(
+                event.pointerId
+            );
+
+            setIsHandDragging(true);
+            return;
+        }
+
+        handlePointerDown(event);
+    }
+
+    function handleCanvasPointerMove(
+        event: ReactPointerEvent<HTMLDivElement>
+    ) {
+        const drag = handPanRef.current;
+
+        if (
+            drag &&
+            drag.pointerId === event.pointerId
+        ) {
+            event.preventDefault();
+
+            const deltaX =
+                event.clientX - drag.lastX;
+
+            const deltaY =
+                event.clientY - drag.lastY;
+
+            drag.lastX = event.clientX;
+            drag.lastY = event.clientY;
+
+            setPan((current) => ({
+                x: current.x + deltaX,
+                y: current.y + deltaY,
+            }));
+
+            return;
+        }
+
+        handlePointerMove(event);
+    }
+
+    function handleCanvasPointerUp(
+        event: ReactPointerEvent<HTMLDivElement>
+    ) {
+        const drag = handPanRef.current;
+
+        if (
+            drag &&
+            drag.pointerId === event.pointerId
+        ) {
+            if (
+                event.currentTarget.hasPointerCapture(
+                    event.pointerId
+                )
+            ) {
+                event.currentTarget.releasePointerCapture(
+                    event.pointerId
+                );
+            }
+
+            handPanRef.current = null;
+            setIsHandDragging(false);
+            return;
+        }
+
+        handlePointerUp(event);
+    }
 
     // UNDO / REDO KEYBOARD SHORTCUTS
 
@@ -326,7 +440,6 @@ export default function WhiteboardCanvas({
             const modifier =
                 event.metaKey || event.ctrlKey;
 
-            // Undo: Cmd/Ctrl + Z.
             if (
                 modifier &&
                 event.key.toLowerCase() === "z" &&
@@ -337,7 +450,6 @@ export default function WhiteboardCanvas({
                 return;
             }
 
-            // Redo: Cmd/Ctrl + Shift + Z.
             if (
                 modifier &&
                 event.key.toLowerCase() === "z" &&
@@ -348,7 +460,6 @@ export default function WhiteboardCanvas({
                 return;
             }
 
-            // Redo: Ctrl + Y on Windows/Linux.
             if (
                 event.ctrlKey &&
                 event.key.toLowerCase() === "y"
@@ -398,7 +509,7 @@ export default function WhiteboardCanvas({
         dark,
     ]);
 
-    // HANDLE CANVAS RESIZING
+    // REDRAW WHEN THE CANVAS CONTAINER RESIZES
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -408,18 +519,17 @@ export default function WhiteboardCanvas({
             return;
         }
 
-        const resizeObserver =
-            new ResizeObserver(() => {
-                renderCanvas({
-                    canvas,
-                    container,
-                    elements,
-                    pan,
-                    zoom,
-                    background,
-                    dark,
-                });
+        const resizeObserver = new ResizeObserver(() => {
+            renderCanvas({
+                canvas,
+                container,
+                elements,
+                pan,
+                zoom,
+                background,
+                dark,
             });
+        });
 
         resizeObserver.observe(container);
 
@@ -440,8 +550,7 @@ export default function WhiteboardCanvas({
         selectedId === null
             ? null
             : elements.find(
-                (element) =>
-                    element.id === selectedId
+                (element) => element.id === selectedId
             ) ?? null;
 
     // UPDATE SELECTED ELEMENT PROPERTIES
@@ -452,8 +561,7 @@ export default function WhiteboardCanvas({
                 id: number,
                 patch: ElementStylePatch
             ) => {
-                const beforeElements =
-                    beginHistory();
+                const beforeElements = beginHistory();
 
                 updateElement(
                     id,
@@ -472,16 +580,12 @@ export default function WhiteboardCanvas({
             ]
         );
 
-    // Notify page.tsx when selection changes.
-
     useEffect(() => {
         onSelectionChange?.(selectedElement);
     }, [
         selectedElement,
         onSelectionChange,
     ]);
-
-    // Expose property updater to page.tsx.
 
     useEffect(() => {
         onPropertyUpdaterReady?.(
@@ -497,36 +601,18 @@ export default function WhiteboardCanvas({
             ref={containerRef}
             className="fixed inset-0 select-none overflow-hidden"
             style={{
-                cursor,
+                cursor: isHandDragging
+                    ? "grabbing"
+                    : activeTool === "hand"
+                        ? "grab"
+                        : cursor,
                 touchAction: "none",
                 overscrollBehavior: "none",
             }}
-            onPointerDown={(event) => {
-                // Ignore clicks on editor overlays, handles and toolbar controls.
-                // Only a direct canvas click should finish an active editor.
-                if (event.target !== canvasRef.current) {
-                    return;
-                }
-
-                if (noteEditor) {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    commitNoteEditing();
-                    return;
-                }
-
-                if (textEditor) {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    commitTextEditing();
-                    return;
-                }
-
-                handlePointerDown(event);
-            }}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onPointerCancel={handlePointerUp}
+            onPointerDown={handleCanvasPointerDown}
+            onPointerMove={handleCanvasPointerMove}
+            onPointerUp={handleCanvasPointerUp}
+            onPointerCancel={handleCanvasPointerUp}
             onContextMenu={(event) => {
                 event.preventDefault();
             }}
@@ -537,6 +623,7 @@ export default function WhiteboardCanvas({
             />
 
             {/* UNDO / REDO */}
+
             <div
                 className={[
                     "absolute bottom-4 left-4 z-50 flex items-center rounded-xl border p-1 shadow-[0_8px_30px_rgba(20,20,30,.08)] backdrop-blur-xl",
@@ -613,6 +700,7 @@ export default function WhiteboardCanvas({
             </div>
 
             {/* SELECTION / RESIZE OVERLAY */}
+
             {selectedElement && (
                 <SelectionOverlay
                     containerRef={containerRef}
@@ -626,6 +714,7 @@ export default function WhiteboardCanvas({
             )}
 
             {/* TEXT EDITOR */}
+
             {textEditor && (
                 <TextEditorOverlay
                     x={textEditor.x}
@@ -642,6 +731,7 @@ export default function WhiteboardCanvas({
             )}
 
             {/* NOTE EDITOR */}
+
             {noteEditor && (
                 <NoteEditorOverlay
                     x={noteEditor.x}
