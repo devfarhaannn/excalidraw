@@ -1,6 +1,7 @@
 "use client";
 
 import {
+    useCallback,
     useEffect,
     useRef,
     useState,
@@ -38,17 +39,26 @@ import TextEditorOverlay from "./TextEditorOverlay";
 import NoteEditorOverlay from "./NoteEditorOverlay";
 
 import type {
+    CanvasElement,
+    ElementPropertyUpdater,
+    ElementStylePatch,
     ToolId,
 } from "../types/whiteboard";
 
 type WhiteboardCanvasProps = {
     zoom: number;
-    onZoomChange: (
-        zoom: number
-    ) => void;
+    onZoomChange: (zoom: number) => void;
     background: string;
     dark: boolean;
     activeTool: ToolId;
+
+    onSelectionChange?: (
+        element: CanvasElement | null
+    ) => void;
+
+    onPropertyUpdaterReady?: (
+        updater: ElementPropertyUpdater
+    ) => void;
 };
 
 export default function WhiteboardCanvas({
@@ -57,16 +67,14 @@ export default function WhiteboardCanvas({
     background,
     dark,
     activeTool,
+    onSelectionChange,
+    onPropertyUpdaterReady,
 }: WhiteboardCanvasProps) {
     const containerRef =
-        useRef<HTMLDivElement | null>(
-            null
-        );
+        useRef<HTMLDivElement | null>(null);
 
     const canvasRef =
-        useRef<HTMLCanvasElement | null>(
-            null
-        );
+        useRef<HTMLCanvasElement | null>(null);
 
     const {
         elements,
@@ -90,15 +98,14 @@ export default function WhiteboardCanvas({
     const [
         textEditor,
         setTextEditor,
-    ] = useState<TextEditingTarget | null>(
-        null
-    );
+    ] = useState<TextEditingTarget | null>(null);
+
     const [
         noteEditor,
         setNoteEditor,
-    ] = useState<NoteEditingTarget | null>(
-        null
-    );
+    ] = useState<NoteEditingTarget | null>(null);
+
+    // TEXT EDITING
 
     function startTextEditing(
         target: TextEditingTarget
@@ -106,9 +113,7 @@ export default function WhiteboardCanvas({
         setTextEditor(target);
     }
 
-    function updateTextEditor(
-        value: string
-    ) {
+    function updateTextEditor(value: string) {
         setTextEditor((current) => {
             if (!current) {
                 return null;
@@ -126,72 +131,45 @@ export default function WhiteboardCanvas({
             return;
         }
 
-        const value =
-            textEditor.text.trim();
+        const value = textEditor.text.trim();
 
-        /*
-         * Empty text = cancel
-         */
         if (!value) {
             setTextEditor(null);
             return;
         }
 
-        /*
-         * New text
-         */
-        if (
-            textEditor.elementId === null
-        ) {
+        // Create new text.
+        if (textEditor.elementId === null) {
             addElement({
                 id:
                     Date.now() +
-                    Math.floor(
-                        Math.random() * 1000
-                    ),
-
+                    Math.floor(Math.random() * 1000),
                 type: "text",
-
                 x: textEditor.x,
-
                 y: textEditor.y,
-
                 text: value,
-
-                fontSize:
-                    textEditor.fontSize,
+                fontSize: textEditor.fontSize,
             });
-        }
-
-        /*
-         * Edit existing text
-         */
-        else {
-            const beforeElements =
-                beginHistory();
+        } else {
+            // Update existing text and record history.
+            const beforeElements = beginHistory();
 
             updateElement(
                 textEditor.elementId,
                 (current) => {
-                    if (
-                        current.type !==
-                        "text"
-                    ) {
+                    if (current.type !== "text") {
                         return current;
                     }
 
                     return {
                         ...current,
                         text: value,
-                        fontSize:
-                            textEditor.fontSize,
+                        fontSize: textEditor.fontSize,
                     };
                 }
             );
 
-            commitHistory(
-                beforeElements
-            );
+            commitHistory(beforeElements);
         }
 
         setTextEditor(null);
@@ -201,15 +179,15 @@ export default function WhiteboardCanvas({
         setTextEditor(null);
     }
 
+    // NOTE EDITING
+
     function startNoteEditing(
         target: NoteEditingTarget
     ) {
         setNoteEditor(target);
     }
 
-    function updateNoteEditor(
-        value: string
-    ) {
+    function updateNoteEditor(value: string) {
         setNoteEditor((current) => {
             if (!current) {
                 return null;
@@ -227,60 +205,34 @@ export default function WhiteboardCanvas({
             return;
         }
 
-        const value =
-            noteEditor.text.trim();
+        const value = noteEditor.text.trim();
 
-        /*
-         * Empty note = cancel
-         */
         if (!value) {
             setNoteEditor(null);
             return;
         }
 
-        /*
-         * New note
-         */
-        if (
-            noteEditor.elementId === null
-        ) {
+        // Create a new note.
+        if (noteEditor.elementId === null) {
             addElement({
                 id:
                     Date.now() +
-                    Math.floor(
-                        Math.random() * 1000
-                    ),
-
+                    Math.floor(Math.random() * 1000),
                 type: "note",
-
                 x: noteEditor.x,
-
                 y: noteEditor.y,
-
-                width:
-                    noteEditor.width,
-
-                height:
-                    noteEditor.height,
-
+                width: noteEditor.width,
+                height: noteEditor.height,
                 text: value,
             });
-        }
-
-        /*
-         * Edit existing note
-         */
-        else {
-            const beforeElements =
-                beginHistory();
+        } else {
+            // Update existing note and record history.
+            const beforeElements = beginHistory();
 
             updateElement(
                 noteEditor.elementId,
                 (current) => {
-                    if (
-                        current.type !==
-                        "note"
-                    ) {
+                    if (current.type !== "note") {
                         return current;
                     }
 
@@ -291,9 +243,7 @@ export default function WhiteboardCanvas({
                 }
             );
 
-            commitHistory(
-                beforeElements
-            );
+            commitHistory(beforeElements);
         }
 
         setNoteEditor(null);
@@ -302,6 +252,8 @@ export default function WhiteboardCanvas({
     function cancelNoteEditing() {
         setNoteEditor(null);
     }
+
+    // PAN AND ZOOM
 
     const {
         pan,
@@ -320,6 +272,8 @@ export default function WhiteboardCanvas({
         pan,
         onPanChange: setPan,
     });
+
+    // DRAWING AND SELECTION
 
     const {
         handlePointerDown,
@@ -342,32 +296,14 @@ export default function WhiteboardCanvas({
 
         spacePressed,
 
-        onStartTextEditing:
-            startTextEditing,
-        onStartNoteEditing:
-            startNoteEditing,
+        onStartTextEditing: startTextEditing,
+        onStartNoteEditing: startNoteEditing,
     });
 
+    // UNDO / REDO KEYBOARD SHORTCUTS
 
-
-    /*
-     * ------------------------------------------
-     * UNDO / REDO KEYBOARD SHORTCUTS
-     * ------------------------------------------
-     *
-     * Mac:
-     * Cmd + Z       → Undo
-     * Cmd + Shift Z → Redo
-     *
-     * Windows/Linux:
-     * Ctrl + Z       → Undo
-     * Ctrl + Shift Z → Redo
-     * Ctrl + Y       → Redo
-     */
     useEffect(() => {
-        function handleKeyDown(
-            event: KeyboardEvent
-        ) {
+        function handleKeyDown(event: KeyboardEvent) {
             const target =
                 event.target as HTMLElement | null;
 
@@ -377,59 +313,41 @@ export default function WhiteboardCanvas({
                 target?.tagName === "SELECT" ||
                 target?.isContentEditable;
 
-            /*
-             * Don't intercept shortcuts while
-             * typing into an input/editor.
-             */
             if (typing) {
                 return;
             }
 
             const modifier =
-                event.metaKey ||
-                event.ctrlKey;
+                event.metaKey || event.ctrlKey;
 
-            /*
-             * Undo
-             */
+            // Undo: Cmd/Ctrl + Z.
             if (
                 modifier &&
                 event.key.toLowerCase() === "z" &&
                 !event.shiftKey
             ) {
                 event.preventDefault();
-
                 undo();
-
                 return;
             }
 
-            /*
-             * Redo:
-             * Cmd/Ctrl + Shift + Z
-             */
+            // Redo: Cmd/Ctrl + Shift + Z.
             if (
                 modifier &&
                 event.key.toLowerCase() === "z" &&
                 event.shiftKey
             ) {
                 event.preventDefault();
-
                 redo();
-
                 return;
             }
 
-            /*
-             * Windows/Linux:
-             * Ctrl + Y
-             */
+            // Redo: Ctrl + Y on Windows/Linux.
             if (
                 event.ctrlKey &&
                 event.key.toLowerCase() === "y"
             ) {
                 event.preventDefault();
-
                 redo();
             }
         }
@@ -445,23 +363,15 @@ export default function WhiteboardCanvas({
                 handleKeyDown
             );
         };
-    }, [
-        undo,
-        redo,
-    ]);
+    }, [undo, redo]);
 
+    // RENDER CANVAS
 
     useEffect(() => {
-        const canvas =
-            canvasRef.current;
+        const canvas = canvasRef.current;
+        const container = containerRef.current;
 
-        const container =
-            containerRef.current;
-
-        if (
-            !canvas ||
-            !container
-        ) {
+        if (!canvas || !container) {
             return;
         }
 
@@ -482,19 +392,13 @@ export default function WhiteboardCanvas({
         dark,
     ]);
 
-    /*
-     */
+    // HANDLE CANVAS RESIZING
+
     useEffect(() => {
-        const canvas =
-            canvasRef.current;
+        const canvas = canvasRef.current;
+        const container = containerRef.current;
 
-        const container =
-            containerRef.current;
-
-        if (
-            !canvas ||
-            !container
-        ) {
+        if (!canvas || !container) {
             return;
         }
 
@@ -511,9 +415,7 @@ export default function WhiteboardCanvas({
                 });
             });
 
-        resizeObserver.observe(
-            container
-        );
+        resizeObserver.observe(container);
 
         return () => {
             resizeObserver.disconnect();
@@ -526,44 +428,91 @@ export default function WhiteboardCanvas({
         dark,
     ]);
 
+    // CURRENT SELECTION
+
     const selectedElement =
         selectedId === null
             ? null
             : elements.find(
                 (element) =>
-                    element.id ===
-                    selectedId
-            );
+                    element.id === selectedId
+            ) ?? null;
+
+    // UPDATE SELECTED ELEMENT PROPERTIES
+
+    const updateElementProperties =
+        useCallback<ElementPropertyUpdater>(
+            (
+                id: number,
+                patch: ElementStylePatch
+            ) => {
+                const beforeElements =
+                    beginHistory();
+
+                updateElement(
+                    id,
+                    (current) => ({
+                        ...current,
+                        ...patch,
+                    }) as CanvasElement
+                );
+
+                commitHistory(beforeElements);
+            },
+            [
+                beginHistory,
+                updateElement,
+                commitHistory,
+            ]
+        );
+
+    // Notify page.tsx when selection changes.
+
+    useEffect(() => {
+        onSelectionChange?.(selectedElement);
+    }, [
+        selectedElement,
+        onSelectionChange,
+    ]);
+
+    // Expose property updater to page.tsx.
+
+    useEffect(() => {
+        onPropertyUpdaterReady?.(
+            updateElementProperties
+        );
+    }, [
+        onPropertyUpdaterReady,
+        updateElementProperties,
+    ]);
 
     return (
         <div
             ref={containerRef}
-            className="fixed inset-0 overflow-hidden select-none"
+            className="fixed inset-0 select-none overflow-hidden"
             style={{
                 cursor,
                 touchAction: "none",
                 overscrollBehavior: "none",
             }}
             onPointerDown={(event) => {
+                /*
+                 * Finish the note editor on outside click.
+                 * Do not send the same click back to the
+                 * drawing handler, or a new note could open.
+                 */
                 if (noteEditor) {
                     event.preventDefault();
                     event.stopPropagation();
-
                     commitNoteEditing();
                     return;
                 }
 
                 handlePointerDown(event);
             }}
-            onPointerMove={
-                handlePointerMove
-            }
-            onPointerUp={
-                handlePointerUp
-            }
-            onPointerCancel={
-                handlePointerUp
-            }
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
             onContextMenu={(event) => {
                 event.preventDefault();
             }}
@@ -573,7 +522,7 @@ export default function WhiteboardCanvas({
                 className="absolute inset-0 block h-full w-full"
             />
 
-
+            {/* UNDO / REDO */}
             <div
                 className={[
                     "absolute bottom-4 left-4 z-50 flex items-center rounded-xl border p-1 shadow-[0_8px_30px_rgba(20,20,30,.08)] backdrop-blur-xl",
@@ -588,10 +537,10 @@ export default function WhiteboardCanvas({
                     event.stopPropagation();
                 }}
             >
-                {/* UNDO */}
                 <button
                     type="button"
                     title="Undo"
+                    aria-label="Undo"
                     disabled={!canUndo}
                     onPointerDown={(event) => {
                         event.stopPropagation();
@@ -602,7 +551,6 @@ export default function WhiteboardCanvas({
                     onClick={(event) => {
                         event.preventDefault();
                         event.stopPropagation();
-
                         undo();
                     }}
                     className={[
@@ -619,10 +567,10 @@ export default function WhiteboardCanvas({
                     <Undo2 className="h-4 w-4" />
                 </button>
 
-                {/* REDO */}
                 <button
                     type="button"
                     title="Redo"
+                    aria-label="Redo"
                     disabled={!canRedo}
                     onPointerDown={(event) => {
                         event.stopPropagation();
@@ -633,7 +581,6 @@ export default function WhiteboardCanvas({
                     onClick={(event) => {
                         event.preventDefault();
                         event.stopPropagation();
-
                         redo();
                     }}
                     className={[
@@ -651,51 +598,36 @@ export default function WhiteboardCanvas({
                 </button>
             </div>
 
+            {/* SELECTION / RESIZE OVERLAY */}
             {selectedElement && (
                 <SelectionOverlay
-                    containerRef={
-                        containerRef
-                    }
-                    element={
-                        selectedElement
-                    }
+                    containerRef={containerRef}
+                    element={selectedElement}
                     zoom={zoom}
                     pan={pan}
-                    updateElement={
-                        updateElement
-                    }
-                    beginHistory={
-                        beginHistory
-                    }
-                    commitHistory={
-                        commitHistory
-                    }
+                    updateElement={updateElement}
+                    beginHistory={beginHistory}
+                    commitHistory={commitHistory}
                 />
             )}
 
+            {/* TEXT EDITOR */}
             {textEditor && (
                 <TextEditorOverlay
                     x={textEditor.x}
                     y={textEditor.y}
                     text={textEditor.text}
-                    fontSize={
-                        textEditor.fontSize
-                    }
+                    fontSize={textEditor.fontSize}
                     zoom={zoom}
                     pan={pan}
                     dark={dark}
-                    onChange={
-                        updateTextEditor
-                    }
-                    onCommit={
-                        commitTextEditing
-                    }
-                    onCancel={
-                        cancelTextEditing
-                    }
+                    onChange={updateTextEditor}
+                    onCommit={commitTextEditing}
+                    onCancel={cancelTextEditing}
                 />
             )}
 
+            {/* NOTE EDITOR */}
             {noteEditor && (
                 <NoteEditorOverlay
                     x={noteEditor.x}
@@ -706,15 +638,9 @@ export default function WhiteboardCanvas({
                     zoom={zoom}
                     pan={pan}
                     dark={dark}
-                    onChange={
-                        updateNoteEditor
-                    }
-                    onCommit={
-                        commitNoteEditing
-                    }
-                    onCancel={
-                        cancelNoteEditing
-                    }
+                    onChange={updateNoteEditor}
+                    onCommit={commitNoteEditing}
+                    onCancel={cancelNoteEditing}
                 />
             )}
         </div>

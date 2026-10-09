@@ -24,9 +24,16 @@ import {
     X,
     type LucideIcon,
 } from "lucide-react";
-import { useParams, useRouter } from "next/navigation";
+
 import {
+    useParams,
+    useRouter,
+} from "next/navigation";
+
+import {
+    useCallback,
     useEffect,
+    useRef,
     useState,
 } from "react";
 
@@ -34,10 +41,12 @@ import WhiteboardCanvas from "./components/WhiteboardCanvas";
 import WhiteboardToolbar from "./components/WhiteboardToolbar";
 
 import type {
+    CanvasElement,
+    ElementPropertyUpdater,
+    ElementStylePatch,
     ThemeMode,
     ToolId,
 } from "./types/whiteboard";
-
 
 const CANVAS_BACKGROUNDS = [
     "#ffffff",
@@ -48,24 +57,51 @@ const CANVAS_BACKGROUNDS = [
     "#eefbf5",
 ];
 
+const ELEMENT_COLORS = [
+    "#27272a",
+    "#ffffff",
+    "#625df5",
+    "#ef4444",
+    "#22a35a",
+    "#f08c36",
+    "#315dcc",
+    "#eab308",
+    "#ec4899",
+    "#14b8a6",
+];
+
 function MenuItem({
     icon: Icon,
     title,
     shortcut,
+    isDark,
     onClick,
 }: {
     icon: LucideIcon;
     title: string;
     shortcut?: string;
+    isDark: boolean;
     onClick?: () => void;
 }) {
     return (
         <button
             type="button"
             onClick={onClick}
-            className="flex h-9 w-full items-center gap-3 rounded-lg px-2.5 text-left text-[12px] text-[#46464f] transition-colors hover:bg-[#f5f4fa]"
+            className={[
+                "flex h-9 w-full items-center gap-3 rounded-lg px-2.5 text-left text-[12px] transition-colors",
+                isDark
+                    ? "text-white/75 hover:bg-white/[0.07]"
+                    : "text-[#46464f] hover:bg-[#f5f4fa]",
+            ].join(" ")}
         >
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center text-[#72727c]">
+            <span
+                className={[
+                    "flex h-7 w-7 shrink-0 items-center justify-center",
+                    isDark
+                        ? "text-white/50"
+                        : "text-[#72727c]",
+                ].join(" ")}
+            >
                 <Icon className="h-4 w-4" />
             </span>
 
@@ -74,7 +110,14 @@ function MenuItem({
             </span>
 
             {shortcut && (
-                <span className="shrink-0 text-[10px] text-[#a1a1aa]">
+                <span
+                    className={[
+                        "shrink-0 text-[10px]",
+                        isDark
+                            ? "text-white/35"
+                            : "text-[#a1a1aa]",
+                    ].join(" ")}
+                >
                     {shortcut}
                 </span>
             )}
@@ -82,9 +125,20 @@ function MenuItem({
     );
 }
 
-function Divider() {
+function Divider({
+    isDark,
+}: {
+    isDark: boolean;
+}) {
     return (
-        <div className="my-1.5 h-px bg-black/[0.06]" />
+        <div
+            className={[
+                "my-1.5 h-px",
+                isDark
+                    ? "bg-white/[0.08]"
+                    : "bg-black/[0.06]",
+            ].join(" ")}
+        />
     );
 }
 
@@ -92,18 +146,13 @@ export default function RoomPage() {
     const params = useParams<{ slug: string }>();
     const router = useRouter();
 
-    const slug = decodeURIComponent(
-        params.slug
-    );
+    const slug = decodeURIComponent(params.slug);
 
-    const [menuOpen, setMenuOpen] =
-        useState(false);
-
+    const [menuOpen, setMenuOpen] = useState(false);
     const [activeTool, setActiveTool] =
         useState<ToolId>("select");
 
-    const [zoom, setZoom] =
-        useState(100);
+    const [zoom, setZoom] = useState(100);
 
     const [theme, setTheme] =
         useState<ThemeMode>("light");
@@ -121,21 +170,34 @@ export default function RoomPage() {
         setMenuSearchOpen,
     ] = useState(false);
 
-    const [locked, setLocked] =
+    const [locked, setLocked] = useState(false);
+
+    const [propertiesOpen, setPropertiesOpen] =
+        useState(false);
+
+    const [
+        selectedElement,
+        setSelectedElement,
+    ] = useState<CanvasElement | null>(null);
+
+    const propertyUpdaterRef =
+        useRef<ElementPropertyUpdater | null>(null);
+
+    const [preferencesLoaded, setPreferencesLoaded] =
         useState(false);
 
     const isDark =
         theme === "dark" ||
-        (
-            theme === "system" &&
-            systemDark
-        );
+        (theme === "system" && systemDark);
 
+    /*
+     * Load saved preferences.
+     * preferencesLoaded prevents the initial default
+     * values from overwriting the saved values.
+     */
     useEffect(() => {
         const savedTheme =
-            localStorage.getItem(
-                "draivo-theme"
-            ) as ThemeMode | null;
+            localStorage.getItem("draivo-theme");
 
         const savedBackground =
             localStorage.getItem(
@@ -150,37 +212,48 @@ export default function RoomPage() {
             setTheme(savedTheme);
         }
 
-        if (savedBackground) {
-            setCanvasBackground(
-                savedBackground
-            );
+        if (
+            savedBackground &&
+            /^#[0-9a-fA-F]{6}$/.test(savedBackground)
+        ) {
+            setCanvasBackground(savedBackground);
         }
+
+        setPreferencesLoaded(true);
     }, []);
 
     useEffect(() => {
+        if (!preferencesLoaded) {
+            return;
+        }
+
         localStorage.setItem(
             "draivo-theme",
             theme
         );
-    }, [theme]);
+    }, [theme, preferencesLoaded]);
 
     useEffect(() => {
+        if (!preferencesLoaded) {
+            return;
+        }
+
         localStorage.setItem(
             "draivo-canvas-background",
             canvasBackground
         );
-    }, [canvasBackground]);
+    }, [canvasBackground, preferencesLoaded]);
 
+    /*
+     * Watch the system theme.
+     */
     useEffect(() => {
-        const mediaQuery =
-            window.matchMedia(
-                "(prefers-color-scheme: dark)"
-            );
+        const mediaQuery = window.matchMedia(
+            "(prefers-color-scheme: dark)"
+        );
 
         const updateSystemTheme = () => {
-            setSystemDark(
-                mediaQuery.matches
-            );
+            setSystemDark(mediaQuery.matches);
         };
 
         updateSystemTheme();
@@ -198,91 +271,83 @@ export default function RoomPage() {
         };
     }, []);
 
+    /*
+     * Escape closes popovers and the command palette.
+     */
     useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-        /*
-         * Don't trigger shortcuts while typing.
-         */
-        const target =
-            event.target as HTMLElement | null;
+        function handleKeyDown(event: KeyboardEvent) {
+            const target =
+                event.target as HTMLElement | null;
 
-        const isTyping =
-            target?.tagName === "INPUT" ||
-            target?.tagName === "TEXTAREA" ||
-            target?.tagName === "SELECT" ||
-            target?.isContentEditable;
+            const isTyping =
+                target?.tagName === "INPUT" ||
+                target?.tagName === "TEXTAREA" ||
+                target?.tagName === "SELECT" ||
+                target?.isContentEditable;
 
-        if (isTyping) {
-            return;
+            if (isTyping) {
+                if (event.key === "Escape") {
+                    setMenuSearchOpen(false);
+                    setMenuOpen(false);
+                }
+
+                return;
+            }
+
+            if (event.key === "Escape") {
+                setMenuOpen(false);
+                setMenuSearchOpen(false);
+                return;
+            }
+
+            switch (event.key.toLowerCase()) {
+                case "v":
+                    setActiveTool("select");
+                    break;
+                case "r":
+                    setActiveTool("rectangle");
+                    break;
+                case "d":
+                    setActiveTool("diamond");
+                    break;
+                case "o":
+                    setActiveTool("ellipse");
+                    break;
+                case "a":
+                    setActiveTool("arrow");
+                    break;
+                case "l":
+                    setActiveTool("line");
+                    break;
+                case "p":
+                    setActiveTool("draw");
+                    break;
+                case "t":
+                    setActiveTool("text");
+                    break;
+                case "n":
+                    setActiveTool("note");
+                    break;
+                case "e":
+                    setActiveTool("eraser");
+                    break;
+            }
         }
 
-        /*
-         * Escape
-         */
-        if (event.key === "Escape") {
-            setMenuOpen(false);
-            setMenuSearchOpen(false);
-            return;
-        }
-
-        /*
-         * Tool shortcuts
-         */
-        switch (event.key.toLowerCase()) {
-            case "v":
-                setActiveTool("select");
-                break;
-
-            case "r":
-                setActiveTool("rectangle");
-                break;
-
-            case "d":
-                setActiveTool("diamond");
-                break;
-
-            case "o":
-                setActiveTool("ellipse");
-                break;
-
-            case "a":
-                setActiveTool("arrow");
-                break;
-
-            case "l":
-                setActiveTool("line");
-                break;
-
-            case "p":
-                setActiveTool("draw");
-                break;
-
-            case "t":
-                setActiveTool("text");
-                break;
-
-            case "n":
-                setActiveTool("note");
-                break;
-
-            case "e":
-                setActiveTool("eraser");
-                break;
-        }
-    }
-
-    window.addEventListener(
-        "keydown",
-        handleKeyDown
-    );
-
-    return () => {
-        window.removeEventListener(
+        window.addEventListener(
             "keydown",
             handleKeyDown
         );
-    };
-}, []);
+
+        return () => {
+            window.removeEventListener(
+                "keydown",
+                handleKeyDown
+            );
+        };
+    }, []);
+
+    // ZOOM
 
     function zoomIn() {
         setZoom((value) =>
@@ -300,28 +365,126 @@ export default function RoomPage() {
         setZoom(100);
     }
 
+    // CANVAS / TOOL ACTIONS
+
     function handleResetCanvas() {
         setZoom(100);
         setActiveTool("select");
-        setCanvasBackground(
-            "#ffffff"
-        );
+        setCanvasBackground("#ffffff");
         setLocked(false);
         setMenuOpen(false);
+        setPropertiesOpen(false);
     }
 
-    function handleToolChange(
-        tool: ToolId
-    ) {
+    function handleToolChange(tool: ToolId) {
         setActiveTool(tool);
         setMenuOpen(false);
+        setMenuSearchOpen(false);
     }
 
-    function handleThemeChange(
-        nextTheme: ThemeMode
-    ) {
+    function handleThemeChange(nextTheme: ThemeMode) {
         setTheme(nextTheme);
     }
+
+    /*
+     * Send selection from WhiteboardCanvas to this page.
+     * Automatically open the floating panel for a selection.
+     */
+    const handleSelectionChange = useCallback(
+        (element: CanvasElement | null) => {
+            setSelectedElement(element);
+
+            if (element) {
+                setPropertiesOpen(true);
+            }
+        },
+        []
+    );
+
+    /*
+     * WhiteboardCanvas exposes the property updater.
+     */
+    const handlePropertyUpdaterReady = useCallback(
+        (updater: ElementPropertyUpdater) => {
+            propertyUpdaterRef.current = updater;
+        },
+        []
+    );
+
+    /*
+     * Change a property on the currently selected element.
+     */
+    function updateSelectedElementProperties(
+        patch: ElementStylePatch
+    ) {
+        if (!selectedElement) {
+            return;
+        }
+
+        propertyUpdaterRef.current?.(
+            selectedElement.id,
+            patch
+        );
+    }
+
+    const selectedCanFill =
+        selectedElement !== null &&
+        [
+            "rectangle",
+            "diamond",
+            "ellipse",
+            "note",
+        ].includes(selectedElement.type);
+
+    const selectedCanHaveStroke =
+        selectedElement !== null &&
+        selectedElement.type !== "text";
+
+    const selectedCanHaveTextColor =
+        selectedElement !== null &&
+        (
+            selectedElement.type === "text" ||
+            selectedElement.type === "note"
+        );
+
+    const defaultStrokeColor =
+        isDark ? "#f4f4f5" : "#27272a";
+
+    const selectedStrokeColor =
+        selectedElement?.strokeColor ??
+        (
+            selectedElement?.type === "note"
+                ? "#d8c95f"
+                : defaultStrokeColor
+        );
+
+    const selectedFillColor =
+        selectedElement?.fillColor ??
+        (
+            selectedElement?.type === "note"
+                ? "#fff3a8"
+                : "#ffffff"
+        );
+
+    const selectedTextColor =
+        selectedElement?.textColor ??
+        (
+            selectedElement?.type === "note"
+                ? "#403d2e"
+                : defaultStrokeColor
+        );
+
+    const surfaceClass = isDark
+        ? "border-white/10 bg-[#242429]/[0.98] text-white"
+        : "border-black/[0.08] bg-white/[0.98] text-[#27272a]";
+
+    const mutedTextClass = isDark
+        ? "text-white/45"
+        : "text-[#888891]";
+
+    const inputClass = isDark
+        ? "border-white/10 bg-white/[0.05] text-white"
+        : "border-black/[0.08] bg-[#f7f7f9] text-[#27272a]";
 
     return (
         <main
@@ -332,18 +495,20 @@ export default function RoomPage() {
                     : "bg-white text-[#17171b]",
             ].join(" ")}
         >
-
-
+            {/* CANVAS */}
             <WhiteboardCanvas
                 zoom={zoom}
                 onZoomChange={setZoom}
                 background={canvasBackground}
                 dark={isDark}
                 activeTool={activeTool}
+                onSelectionChange={handleSelectionChange}
+                onPropertyUpdaterReady={
+                    handlePropertyUpdaterReady
+                }
             />
 
-
-
+            {/* MENU DISMISS BACKDROP */}
             {menuOpen && (
                 <button
                     type="button"
@@ -356,25 +521,18 @@ export default function RoomPage() {
                 />
             )}
 
-
-
+            {/* TOP LEFT: MENU AND ROOM NAME */}
             <div className="absolute left-4 top-4 z-50">
                 <div className="flex items-center">
                     <button
                         type="button"
                         aria-label="Open menu"
                         onClick={() => {
-                            setMenuOpen(
-                                (value) =>
-                                    !value
-                            );
-
-                            setMenuSearchOpen(
-                                false
-                            );
+                            setMenuOpen((value) => !value);
+                            setMenuSearchOpen(false);
                         }}
                         className={[
-                            "flex h-10 w-10 items-center justify-center rounded-xl border shadow-sm transition-all duration-150",
+                            "flex h-10 w-10 items-center justify-center rounded-xl border shadow-sm transition-colors",
                             isDark
                                 ? "border-white/10 bg-[#242429]/95 text-white/75 hover:bg-[#2b2b31]"
                                 : "border-black/[0.07] bg-white/95 text-[#66666f] hover:bg-white",
@@ -395,19 +553,18 @@ export default function RoomPage() {
                     </div>
                 </div>
 
-
+                {/* APP MENU */}
                 {menuOpen && (
                     <div
                         onClick={(event) =>
                             event.stopPropagation()
                         }
                         className={[
-                            "absolute left-0 top-12 w-[258px] overflow-hidden rounded-2xl border p-2 shadow-[0_24px_70px_rgba(20,20,30,.16)] backdrop-blur-2xl",
-                            isDark
-                                ? "border-white/10 bg-[#242429]/95"
-                                : "border-black/[0.08] bg-white/[0.97]",
+                            "absolute left-0 top-12 w-[270px] overflow-hidden rounded-2xl border p-2 shadow-[0_24px_70px_rgba(20,20,30,.20)] backdrop-blur-2xl",
+                            surfaceClass,
                         ].join(" ")}
                     >
+                        {/* Room heading */}
                         <div className="px-2.5 py-2">
                             <div className="flex items-center gap-2.5">
                                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#625DF5] text-xs font-semibold text-white">
@@ -418,171 +575,151 @@ export default function RoomPage() {
                                     <p
                                         className={[
                                             "text-[10px] font-semibold uppercase tracking-[0.16em]",
-                                            isDark
-                                                ? "text-white/35"
-                                                : "text-[#a1a1aa]",
+                                            mutedTextClass,
                                         ].join(" ")}
                                     >
                                         Draivo
                                     </p>
 
-                                    <p
-                                        className={[
-                                            "mt-0.5 truncate text-[12px] font-medium",
-                                            isDark
-                                                ? "text-white/80"
-                                                : "text-[#34343b]",
-                                        ].join(" ")}
-                                    >
+                                    <p className="mt-0.5 truncate text-[12px] font-medium">
                                         {slug}
                                     </p>
                                 </div>
                             </div>
                         </div>
 
-                        <Divider />
+                        <Divider isDark={isDark} />
 
                         <MenuItem
                             icon={FolderOpen}
                             title="Open"
                             shortcut="⌘O"
-                            onClick={() =>
-                                router.push(
-                                    "/dashboard"
-                                )
-                            }
+                            isDark={isDark}
+                            onClick={() => {
+                                setMenuOpen(false);
+                                router.push("/dashboard");
+                            }}
                         />
 
                         <MenuItem
                             icon={Download}
                             title="Save to..."
-                            onClick={() =>
-                                setMenuOpen(false)
-                            }
+                            isDark={isDark}
+                            onClick={() => setMenuOpen(false)}
                         />
 
                         <MenuItem
                             icon={FileImage}
                             title="Export image..."
                             shortcut="⌘⇧E"
-                            onClick={() =>
-                                setMenuOpen(false)
-                            }
+                            isDark={isDark}
+                            onClick={() => setMenuOpen(false)}
                         />
 
                         <MenuItem
                             icon={Users}
                             title="Live collaboration..."
-                            onClick={() =>
-                                setMenuOpen(false)
-                            }
+                            isDark={isDark}
+                            onClick={() => setMenuOpen(false)}
                         />
 
                         <MenuItem
                             icon={Command}
                             title="Command palette"
                             shortcut="⌘/"
-                            onClick={() =>
-                                setMenuSearchOpen(
-                                    true
-                                )
-                            }
+                            isDark={isDark}
+                            onClick={() => {
+                                setMenuSearchOpen(true);
+                                setMenuOpen(false);
+                            }}
                         />
 
                         <MenuItem
                             icon={Search}
                             title="Find on canvas"
                             shortcut="⌘F"
-                            onClick={() =>
-                                setMenuOpen(false)
-                            }
+                            isDark={isDark}
+                            onClick={() => setMenuOpen(false)}
                         />
 
                         <MenuItem
                             icon={HelpCircle}
                             title="Help"
                             shortcut="?"
-                            onClick={() =>
-                                setMenuOpen(false)
-                            }
+                            isDark={isDark}
+                            onClick={() => setMenuOpen(false)}
                         />
 
                         <MenuItem
                             icon={RotateCcw}
                             title="Reset the canvas"
-                            onClick={
-                                handleResetCanvas
-                            }
+                            isDark={isDark}
+                            onClick={handleResetCanvas}
                         />
 
-                        <Divider />
+                        <Divider isDark={isDark} />
 
                         <MenuItem
                             icon={Palette}
                             title="Draivo+"
-                            onClick={() =>
-                                setMenuOpen(false)
-                            }
+                            isDark={isDark}
+                            onClick={() => setMenuOpen(false)}
                         />
 
                         <MenuItem
                             icon={Link2}
                             title="GitHub"
-                            onClick={() =>
-                                setMenuOpen(false)
-                            }
+                            isDark={isDark}
+                            onClick={() => setMenuOpen(false)}
                         />
 
                         <MenuItem
                             icon={Users}
                             title="Follow us"
-                            onClick={() =>
-                                setMenuOpen(false)
-                            }
+                            isDark={isDark}
+                            onClick={() => setMenuOpen(false)}
                         />
 
                         <MenuItem
                             icon={Share2}
                             title="Discord chat"
-                            onClick={() =>
-                                setMenuOpen(false)
-                            }
+                            isDark={isDark}
+                            onClick={() => setMenuOpen(false)}
                         />
 
                         <MenuItem
                             icon={ArrowUpRight}
                             title="Sign up"
-                            onClick={() =>
-                                setMenuOpen(false)
-                            }
+                            isDark={isDark}
+                            onClick={() => setMenuOpen(false)}
                         />
 
-                        <Divider />
+                        <Divider isDark={isDark} />
 
                         <MenuItem
                             icon={Settings}
                             title="Preferences"
                             shortcut="›"
-                            onClick={() =>
-                                setMenuOpen(false)
-                            }
+                            isDark={isDark}
+                            onClick={() => {
+                                setPropertiesOpen(true);
+                                setMenuOpen(false);
+                            }}
                         />
 
-
+                        {/* Theme settings */}
                         <div className="px-2.5 py-2">
                             <div className="flex items-center gap-3">
-                                <span className="flex h-7 w-7 items-center justify-center text-[#72727c]">
+                                <span
+                                    className={[
+                                        "flex h-7 w-7 items-center justify-center",
+                                        mutedTextClass,
+                                    ].join(" ")}
+                                >
                                     <Palette className="h-4 w-4" />
                                 </span>
 
-                                <span
-                                    className={[
-                                        "text-[12px]",
-                                        isDark
-                                            ? "text-white/75"
-                                            : "text-[#46464f]",
-                                    ].join(" ")}
-                                >
+                                <span className="text-[12px]">
                                     Theme
                                 </span>
                             </div>
@@ -595,74 +732,83 @@ export default function RoomPage() {
                                         : "border-black/[0.06] bg-[#f7f7f9]",
                                 ].join(" ")}
                             >
-                                <button
-                                    type="button"
-                                    title="Light"
-                                    onClick={() =>
-                                        handleThemeChange(
-                                            "light"
-                                        )
-                                    }
-                                    className={[
-                                        "flex h-8 items-center justify-center rounded-md transition-colors",
-                                        theme ===
-                                            "light"
-                                            ? "bg-white text-[#625DF5] shadow-sm"
-                                            : isDark
-                                                ? "text-white/40 hover:text-white/70"
-                                                : "text-[#96969e] hover:text-[#55555d]",
-                                    ].join(" ")}
-                                >
-                                    <Sun className="h-3.5 w-3.5" />
-                                </button>
+                                {(
+                                    [
+                                        "light",
+                                        "dark",
+                                        "system",
+                                    ] as ThemeMode[]
+                                ).map((mode) => (
+                                    <button
+                                        key={mode}
+                                        type="button"
+                                        title={mode}
+                                        aria-pressed={theme === mode}
+                                        onClick={() =>
+                                            handleThemeChange(mode)
+                                        }
+                                        className={[
+                                            "flex h-8 items-center justify-center rounded-md text-[11px] capitalize transition-colors",
+                                            theme === mode
+                                                ? "bg-[#625DF5] text-white shadow-sm"
+                                                : isDark
+                                                    ? "text-white/50 hover:bg-white/[0.06]"
+                                                    : "text-[#777781] hover:bg-white",
+                                        ].join(" ")}
+                                    >
+                                        {mode === "light" ? (
+                                            <Sun className="mr-1 h-3.5 w-3.5" />
+                                        ) : mode === "dark" ? (
+                                            <span className="mr-1">◐</span>
+                                        ) : (
+                                            <span className="mr-1">▣</span>
+                                        )}
 
-                                <button
-                                    type="button"
-                                    title="Dark"
-                                    onClick={() =>
-                                        handleThemeChange(
-                                            "dark"
-                                        )
-                                    }
-                                    className={[
-                                        "flex h-8 items-center justify-center rounded-md transition-colors",
-                                        theme ===
-                                            "dark"
-                                            ? "bg-[#34343b] text-white shadow-sm"
-                                            : isDark
-                                                ? "text-white/40 hover:text-white/70"
-                                                : "text-[#96969e] hover:text-[#55555d]",
-                                    ].join(" ")}
-                                >
-                                    <span className="text-[13px]">
-                                        ◐
-                                    </span>
-                                </button>
+                                        {mode === "system"
+                                            ? "System"
+                                            : mode}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
 
-                                <button
-                                    type="button"
-                                    title="System"
-                                    onClick={() =>
-                                        handleThemeChange(
-                                            "system"
-                                        )
-                                    }
-                                    className={[
-                                        "flex h-8 items-center justify-center rounded-md transition-colors",
-                                        theme ===
-                                            "system"
-                                            ? isDark
-                                                ? "bg-[#34343b] text-white shadow-sm"
-                                                : "bg-white text-[#625DF5] shadow-sm"
-                                            : isDark
-                                                ? "text-white/40 hover:text-white/70"
-                                                : "text-[#96969e] hover:text-[#55555d]",
-                                    ].join(" ")}
-                                >
-                                    <span className="text-[12px]">
-                                        ▣
-                                    </span>
-                                </button>
+                        {/* Canvas background presets */}
+                        <div className="px-2.5 pb-2 pt-2">
+                            <p
+                                className={[
+                                    "px-1 text-[11px] font-medium",
+                                    mutedTextClass,
+                                ].join(" ")}
+                            >
+                                Canvas background
+                            </p>
+
+                            <div className="mt-2 flex items-center gap-2 px-1">
+                                {CANVAS_BACKGROUNDS.map((color) => (
+                                    <button
+                                        key={color}
+                                        type="button"
+                                        title={`Canvas ${color}`}
+                                        aria-label={`Canvas background ${color}`}
+                                        aria-pressed={
+                                            canvasBackground === color
+                                        }
+                                        onClick={() =>
+                                            setCanvasBackground(color)
+                                        }
+                                        className={[
+                                            "h-7 w-7 rounded-lg border shadow-sm transition-all hover:scale-105",
+                                            canvasBackground === color
+                                                ? "border-[#625DF5] ring-2 ring-[#625DF5]/20"
+                                                : isDark
+                                                    ? "border-white/10"
+                                                    : "border-black/[0.08]",
+                                        ].join(" ")}
+                                        style={{
+                                            backgroundColor: color,
+                                        }}
+                                    />
+                                ))}
                             </div>
                         </div>
 
@@ -670,72 +816,21 @@ export default function RoomPage() {
                             icon={Languages}
                             title="English"
                             shortcut="›"
-                            onClick={() =>
-                                setMenuOpen(false)
-                            }
+                            isDark={isDark}
+                            onClick={() => setMenuOpen(false)}
                         />
-
-
-                        <div className="px-2.5 pb-2 pt-2">
-                            <p
-                                className={[
-                                    "px-1 text-[11px] font-medium",
-                                    isDark
-                                        ? "text-white/50"
-                                        : "text-[#777781]",
-                                ].join(" ")}
-                            >
-                                Canvas background
-                            </p>
-
-                            <div className="mt-2 flex items-center gap-2 px-1">
-                                {CANVAS_BACKGROUNDS.map(
-                                    (color) => {
-                                        const active =
-                                            canvasBackground ===
-                                            color;
-
-                                        return (
-                                            <button
-                                                key={
-                                                    color
-                                                }
-                                                type="button"
-                                                title={`Canvas ${color}`}
-                                                onClick={() =>
-                                                    setCanvasBackground(
-                                                        color
-                                                    )
-                                                }
-                                                className={[
-                                                    "h-7 w-7 rounded-lg border shadow-sm transition-all duration-150 hover:scale-105",
-                                                    active
-                                                        ? "border-[#625DF5] ring-2 ring-[#625DF5]/20"
-                                                        : isDark
-                                                            ? "border-white/10"
-                                                            : "border-black/[0.08]",
-                                                ].join(" ")}
-                                                style={{
-                                                    backgroundColor:
-                                                        color,
-                                                }}
-                                            />
-                                        );
-                                    }
-                                )}
-                            </div>
-                        </div>
                     </div>
                 )}
             </div>
 
+            {/* DRAWING TOOLBAR */}
             <WhiteboardToolbar
                 activeTool={activeTool}
                 isDark={isDark}
                 onToolChange={handleToolChange}
             />
 
-
+            {/* TOP RIGHT ACTIONS */}
             <div className="absolute right-4 top-4 z-30 flex items-center gap-2">
                 <button
                     type="button"
@@ -751,10 +846,8 @@ export default function RoomPage() {
 
                 <button
                     type="button"
-                    onClick={() =>
-                        setMenuOpen(false)
-                    }
-                    className="flex h-10 items-center gap-2 rounded-xl bg-[#625DF5] px-4 text-[11px] font-semibold text-white shadow-[0_8px_22px_rgba(98,93,245,.22)] transition-all hover:bg-[#554ff0]"
+                    onClick={() => setMenuOpen(false)}
+                    className="flex h-10 items-center gap-2 rounded-xl bg-[#625DF5] px-4 text-[11px] font-semibold text-white shadow-[0_8px_22px_rgba(98,93,245,.22)] transition-colors hover:bg-[#554ff0]"
                 >
                     <Users className="h-4 w-4" />
 
@@ -765,22 +858,543 @@ export default function RoomPage() {
 
                 <button
                     type="button"
-                    title="Open panel"
-                    onClick={() =>
-                        setMenuOpen(false)
+                    title={
+                        propertiesOpen
+                            ? "Close properties"
+                            : "Open properties"
                     }
+                    aria-label="Toggle properties panel"
+                    aria-pressed={propertiesOpen}
+                    onClick={() => {
+                        setPropertiesOpen((value) => !value);
+                        setMenuOpen(false);
+                    }}
                     className={[
                         "flex h-10 w-10 items-center justify-center rounded-xl border shadow-sm transition-colors",
-                        isDark
-                            ? "border-white/10 bg-[#242429]/95 text-white/60 hover:bg-[#2b2b31]"
-                            : "border-black/[0.07] bg-white/95 text-[#676770] hover:bg-white",
+                        propertiesOpen
+                            ? "border-[#625DF5]/25 bg-[#625DF5]/10 text-[#625DF5]"
+                            : isDark
+                                ? "border-white/10 bg-[#242429]/95 text-white/60 hover:bg-[#2b2b31]"
+                                : "border-black/[0.07] bg-white/95 text-[#676770] hover:bg-white",
                     ].join(" ")}
                 >
                     <PanelRight className="h-4 w-4" />
                 </button>
             </div>
 
+            {/* FLOATING CONTEXTUAL PROPERTIES PANEL */}
+            {propertiesOpen && (
+                <aside
+                    aria-label="Properties panel"
+                    onPointerDown={(event) =>
+                        event.stopPropagation()
+                    }
+                    onPointerUp={(event) =>
+                        event.stopPropagation()
+                    }
+                    className={[
+                        "absolute left-[76px] top-16 z-40 flex max-h-[calc(100vh-7rem)] w-[min(268px,calc(100vw-92px))] flex-col overflow-hidden rounded-2xl border shadow-[0_20px_60px_rgba(20,20,30,.18)] backdrop-blur-xl",
+                        surfaceClass,
+                    ].join(" ")}
+                >
+                    {/* Header */}
+                    <div
+                        className={[
+                            "flex items-center justify-between border-b px-4 py-3",
+                            isDark
+                                ? "border-white/10"
+                                : "border-black/[0.07]",
+                        ].join(" ")}
+                    >
+                        <div>
+                            <p className="text-sm font-semibold">
+                                {selectedElement
+                                    ? "Properties"
+                                    : "Canvas settings"}
+                            </p>
 
+                            <p
+                                className={[
+                                    "mt-1 text-[11px] capitalize",
+                                    mutedTextClass,
+                                ].join(" ")}
+                            >
+                                {selectedElement
+                                    ? `${selectedElement.type} selected`
+                                    : "Customize workspace"}
+                            </p>
+                        </div>
+
+                        <button
+                            type="button"
+                            aria-label="Close properties panel"
+                            onClick={() =>
+                                setPropertiesOpen(false)
+                            }
+                            className={[
+                                "flex h-8 w-8 items-center justify-center rounded-lg",
+                                isDark
+                                    ? "text-white/55 hover:bg-white/[0.07]"
+                                    : "text-[#777781] hover:bg-black/[0.05]",
+                            ].join(" ")}
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
+                    </div>
+
+                    <div className="space-y-5 overflow-y-auto p-4">
+                        {selectedElement ? (
+                            <>
+                                {/* STROKE COLOR */}
+                                {selectedCanHaveStroke && (
+                                    <section>
+                                        <p className="text-xs font-medium">
+                                            Stroke color
+                                        </p>
+
+                                        <div className="mt-2 flex items-center gap-2">
+                                            <input
+                                                type="color"
+                                                aria-label="Stroke color"
+                                                value={selectedStrokeColor}
+                                                onChange={(event) =>
+                                                    updateSelectedElementProperties({
+                                                        strokeColor:
+                                                            event.currentTarget.value,
+                                                    })
+                                                }
+                                                className="h-9 w-11 cursor-pointer rounded-md border-0 bg-transparent"
+                                            />
+
+                                            <input
+                                                type="text"
+                                                aria-label="Stroke HEX color"
+                                                value={selectedStrokeColor}
+                                                onChange={(event) => {
+                                                    const value =
+                                                        event.currentTarget.value;
+
+                                                    if (
+                                                        /^#[0-9a-fA-F]{6}$/.test(value)
+                                                    ) {
+                                                        updateSelectedElementProperties({
+                                                            strokeColor: value,
+                                                        });
+                                                    }
+                                                }}
+                                                className={[
+                                                    "min-w-0 flex-1 rounded-lg border px-2 py-2 font-mono text-[11px] outline-none focus:border-[#625DF5]",
+                                                    inputClass,
+                                                ].join(" ")}
+                                            />
+                                        </div>
+
+                                        <div className="mt-2 flex flex-wrap gap-2">
+                                            {ELEMENT_COLORS.map((color) => (
+                                                <button
+                                                    key={color}
+                                                    type="button"
+                                                    title={color}
+                                                    aria-label={`Set stroke to ${color}`}
+                                                    onClick={() =>
+                                                        updateSelectedElementProperties({
+                                                            strokeColor: color,
+                                                        })
+                                                    }
+                                                    className={[
+                                                        "h-5 w-5 rounded-md border transition-transform hover:scale-110",
+                                                        selectedStrokeColor === color
+                                                            ? "border-[#625DF5] ring-2 ring-[#625DF5]/30"
+                                                            : "border-black/10",
+                                                    ].join(" ")}
+                                                    style={{
+                                                        backgroundColor: color,
+                                                    }}
+                                                />
+                                            ))}
+                                        </div>
+                                    </section>
+                                )}
+
+                                {/* FILL / NOTE BACKGROUND */}
+                                {selectedCanFill && (
+                                    <section>
+                                        <p className="text-xs font-medium">
+                                            {selectedElement.type === "note"
+                                                ? "Note background"
+                                                : "Background"}
+                                        </p>
+
+                                        <div className="mt-2 flex items-center gap-2">
+                                            <input
+                                                type="color"
+                                                aria-label="Element fill color"
+                                                value={selectedFillColor}
+                                                onChange={(event) =>
+                                                    updateSelectedElementProperties({
+                                                        fillColor:
+                                                            event.currentTarget.value,
+                                                    })
+                                                }
+                                                className="h-9 w-11 cursor-pointer rounded-md border-0 bg-transparent"
+                                            />
+
+                                            <input
+                                                type="text"
+                                                aria-label="Fill HEX color"
+                                                value={selectedFillColor}
+                                                onChange={(event) => {
+                                                    const value =
+                                                        event.currentTarget.value;
+
+                                                    if (
+                                                        /^#[0-9a-fA-F]{6}$/.test(value)
+                                                    ) {
+                                                        updateSelectedElementProperties({
+                                                            fillColor: value,
+                                                        });
+                                                    }
+                                                }}
+                                                className={[
+                                                    "min-w-0 flex-1 rounded-lg border px-2 py-2 font-mono text-[11px] outline-none focus:border-[#625DF5]",
+                                                    inputClass,
+                                                ].join(" ")}
+                                            />
+                                        </div>
+
+                                        <div className="mt-2 flex flex-wrap gap-2">
+                                            {ELEMENT_COLORS.map((color) => (
+                                                <button
+                                                    key={color}
+                                                    type="button"
+                                                    title={color}
+                                                    aria-label={`Set fill to ${color}`}
+                                                    onClick={() =>
+                                                        updateSelectedElementProperties({
+                                                            fillColor: color,
+                                                        })
+                                                    }
+                                                    className={[
+                                                        "h-5 w-5 rounded-md border transition-transform hover:scale-110",
+                                                        selectedFillColor === color
+                                                            ? "border-[#625DF5] ring-2 ring-[#625DF5]/30"
+                                                            : "border-black/10",
+                                                    ].join(" ")}
+                                                    style={{
+                                                        backgroundColor: color,
+                                                    }}
+                                                />
+                                            ))}
+                                        </div>
+
+                                        {selectedElement.type !== "note" && (
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    updateSelectedElementProperties({
+                                                        fillColor: undefined,
+                                                    })
+                                                }
+                                                className={[
+                                                    "mt-2 rounded-lg px-2.5 py-1.5 text-[11px]",
+                                                    isDark
+                                                        ? "bg-white/[0.06] text-white/70 hover:bg-white/[0.10]"
+                                                        : "bg-black/[0.04] text-[#62626c] hover:bg-black/[0.07]",
+                                                ].join(" ")}
+                                            >
+                                                Remove fill
+                                            </button>
+                                        )}
+                                    </section>
+                                )}
+
+                                {/* TEXT COLOR */}
+                                {selectedCanHaveTextColor && (
+                                    <section>
+                                        <p className="text-xs font-medium">
+                                            Text color
+                                        </p>
+
+                                        <div className="mt-2 flex items-center gap-2">
+                                            <input
+                                                type="color"
+                                                aria-label="Text color"
+                                                value={selectedTextColor}
+                                                onChange={(event) =>
+                                                    updateSelectedElementProperties({
+                                                        textColor:
+                                                            event.currentTarget.value,
+                                                    })
+                                                }
+                                                className="h-9 w-11 cursor-pointer rounded-md border-0 bg-transparent"
+                                            />
+
+                                            <input
+                                                type="text"
+                                                aria-label="Text HEX color"
+                                                value={selectedTextColor}
+                                                onChange={(event) => {
+                                                    const value =
+                                                        event.currentTarget.value;
+
+                                                    if (
+                                                        /^#[0-9a-fA-F]{6}$/.test(value)
+                                                    ) {
+                                                        updateSelectedElementProperties({
+                                                            textColor: value,
+                                                        });
+                                                    }
+                                                }}
+                                                className={[
+                                                    "min-w-0 flex-1 rounded-lg border px-2 py-2 font-mono text-[11px] outline-none focus:border-[#625DF5]",
+                                                    inputClass,
+                                                ].join(" ")}
+                                            />
+                                        </div>
+                                    </section>
+                                )}
+
+                                {/* STROKE WIDTH */}
+                                {selectedCanHaveStroke && (
+                                    <section>
+                                        <div className="flex items-center justify-between">
+                                            <label
+                                                htmlFor="element-stroke-width"
+                                                className="text-xs font-medium"
+                                            >
+                                                Stroke width
+                                            </label>
+
+                                            <span
+                                                className={[
+                                                    "text-xs tabular-nums",
+                                                    mutedTextClass,
+                                                ].join(" ")}
+                                            >
+                                                {selectedElement.strokeWidth ?? 2}px
+                                            </span>
+                                        </div>
+
+                                        <input
+                                            id="element-stroke-width"
+                                            type="range"
+                                            min={1}
+                                            max={8}
+                                            step={1}
+                                            value={
+                                                selectedElement.strokeWidth ?? 2
+                                            }
+                                            onChange={(event) =>
+                                                updateSelectedElementProperties({
+                                                    strokeWidth:
+                                                        Number(event.currentTarget.value),
+                                                })
+                                            }
+                                            className="mt-3 w-full accent-[#625DF5]"
+                                        />
+                                    </section>
+                                )}
+
+                                {/* FONT SIZE */}
+                                {selectedElement.type === "text" && (
+                                    <section>
+                                        <div className="flex items-center justify-between">
+                                            <label
+                                                htmlFor="element-font-size"
+                                                className="text-xs font-medium"
+                                            >
+                                                Font size
+                                            </label>
+
+                                            <span
+                                                className={[
+                                                    "text-xs tabular-nums",
+                                                    mutedTextClass,
+                                                ].join(" ")}
+                                            >
+                                                {selectedElement.fontSize ?? 20}px
+                                            </span>
+                                        </div>
+
+                                        <input
+                                            id="element-font-size"
+                                            type="range"
+                                            min={10}
+                                            max={64}
+                                            step={1}
+                                            value={
+                                                selectedElement.fontSize ?? 20
+                                            }
+                                            onChange={(event) =>
+                                                updateSelectedElementProperties({
+                                                    fontSize:
+                                                        Number(event.currentTarget.value),
+                                                })
+                                            }
+                                            className="mt-3 w-full accent-[#625DF5]"
+                                        />
+                                    </section>
+                                )}
+
+                                {/* OPACITY */}
+                                <section>
+                                    <div className="flex items-center justify-between">
+                                        <label
+                                            htmlFor="element-opacity"
+                                            className="text-xs font-medium"
+                                        >
+                                            Opacity
+                                        </label>
+
+                                        <span
+                                            className={[
+                                                "text-xs tabular-nums",
+                                                mutedTextClass,
+                                            ].join(" ")}
+                                        >
+                                            {Math.round(
+                                                (selectedElement.opacity ?? 1) * 100
+                                            )}%
+                                        </span>
+                                    </div>
+
+                                    <input
+                                        id="element-opacity"
+                                        type="range"
+                                        min={0}
+                                        max={1}
+                                        step={0.05}
+                                        value={selectedElement.opacity ?? 1}
+                                        onChange={(event) =>
+                                            updateSelectedElementProperties({
+                                                opacity:
+                                                    Number(event.currentTarget.value),
+                                            })
+                                        }
+                                        className="mt-3 w-full accent-[#625DF5]"
+                                    />
+                                </section>
+                            </>
+                        ) : (
+                            <>
+                                {/* THEME SETTINGS */}
+                                <section>
+                                    <p className="text-xs font-semibold">
+                                        Appearance
+                                    </p>
+
+                                    <div
+                                        className={[
+                                            "mt-3 grid grid-cols-3 gap-1 rounded-xl border p-1",
+                                            isDark
+                                                ? "border-white/10 bg-white/[0.04]"
+                                                : "border-black/[0.07] bg-[#f7f7f9]",
+                                        ].join(" ")}
+                                    >
+                                        {(
+                                            [
+                                                "light",
+                                                "dark",
+                                                "system",
+                                            ] as ThemeMode[]
+                                        ).map((mode) => (
+                                            <button
+                                                key={mode}
+                                                type="button"
+                                                aria-pressed={theme === mode}
+                                                onClick={() =>
+                                                    handleThemeChange(mode)
+                                                }
+                                                className={[
+                                                    "rounded-lg px-2 py-2 text-[11px] capitalize transition-colors",
+                                                    theme === mode
+                                                        ? "bg-[#625DF5] text-white"
+                                                        : isDark
+                                                            ? "text-white/60 hover:bg-white/[0.06]"
+                                                            : "text-[#666670] hover:bg-white",
+                                                ].join(" ")}
+                                            >
+                                                {mode}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </section>
+
+                                {/* CANVAS BACKGROUND */}
+                                <section>
+                                    <p className="text-xs font-semibold">
+                                        Canvas background
+                                    </p>
+
+                                    <div className="mt-3 flex items-center gap-2">
+                                        <input
+                                            type="color"
+                                            aria-label="Custom canvas background"
+                                            value={canvasBackground}
+                                            onChange={(event) =>
+                                                setCanvasBackground(
+                                                    event.currentTarget.value
+                                                )
+                                            }
+                                            className="h-9 w-11 cursor-pointer rounded-md border-0 bg-transparent"
+                                        />
+
+                                        <input
+                                            type="text"
+                                            aria-label="Canvas HEX color"
+                                            value={canvasBackground}
+                                            onChange={(event) => {
+                                                const value =
+                                                    event.currentTarget.value;
+
+                                                if (
+                                                    /^#[0-9a-fA-F]{6}$/.test(value)
+                                                ) {
+                                                    setCanvasBackground(value);
+                                                }
+                                            }}
+                                            className={[
+                                                "min-w-0 flex-1 rounded-lg border px-2 py-2 font-mono text-[11px] outline-none focus:border-[#625DF5]",
+                                                inputClass,
+                                            ].join(" ")}
+                                        />
+                                    </div>
+
+                                    <div className="mt-3 grid grid-cols-6 gap-2">
+                                        {CANVAS_BACKGROUNDS.map((color) => (
+                                            <button
+                                                key={color}
+                                                type="button"
+                                                title={color}
+                                                aria-label={`Set canvas background to ${color}`}
+                                                aria-pressed={
+                                                    canvasBackground === color
+                                                }
+                                                onClick={() =>
+                                                    setCanvasBackground(color)
+                                                }
+                                                className={[
+                                                    "h-8 w-full rounded-lg border transition-transform hover:scale-105",
+                                                    canvasBackground === color
+                                                        ? "border-[#625DF5] ring-2 ring-[#625DF5]/25"
+                                                        : isDark
+                                                            ? "border-white/10"
+                                                            : "border-black/[0.08]",
+                                                ].join(" ")}
+                                                style={{
+                                                    backgroundColor: color,
+                                                }}
+                                            />
+                                        ))}
+                                    </div>
+                                </section>
+                            </>
+                        )}
+                    </div>
+                </aside>
+            )}
+
+            {/* ZOOM CONTROLS */}
             <div
                 className={[
                     "absolute bottom-4 left-1/2 z-30 flex -translate-x-1/2 items-center rounded-xl border p-1 shadow-[0_8px_30px_rgba(20,20,30,.08)] backdrop-blur-xl",
@@ -792,6 +1406,7 @@ export default function RoomPage() {
                 <button
                     type="button"
                     title="Zoom out"
+                    aria-label="Zoom out"
                     onClick={zoomOut}
                     className={[
                         "flex h-8 w-8 items-center justify-center rounded-lg",
@@ -820,6 +1435,7 @@ export default function RoomPage() {
                 <button
                     type="button"
                     title="Zoom in"
+                    aria-label="Zoom in"
                     onClick={zoomIn}
                     className={[
                         "flex h-8 w-8 items-center justify-center rounded-lg",
@@ -832,19 +1448,14 @@ export default function RoomPage() {
                 </button>
             </div>
 
+            {/* LOCK / HELP */}
             <div className="absolute bottom-4 right-4 z-30 flex items-center gap-2">
                 <button
                     type="button"
-                    title={
-                        locked
-                            ? "Unlock canvas"
-                            : "Lock canvas"
-                    }
+                    title={locked ? "Unlock canvas" : "Lock canvas"}
+                    aria-pressed={locked}
                     onClick={() =>
-                        setLocked(
-                            (value) =>
-                                !value
-                        )
+                        setLocked((value) => !value)
                     }
                     className={[
                         "flex h-9 w-9 items-center justify-center rounded-xl border shadow-sm",
@@ -872,13 +1483,12 @@ export default function RoomPage() {
                 </button>
             </div>
 
+            {/* COMMAND PALETTE */}
             {menuSearchOpen && (
                 <div
                     className="fixed inset-0 z-[70] flex items-start justify-center bg-black/20 px-4 pt-[18vh] backdrop-blur-[2px]"
                     onClick={() =>
-                        setMenuSearchOpen(
-                            false
-                        )
+                        setMenuSearchOpen(false)
                     }
                 >
                     <div
@@ -887,13 +1497,23 @@ export default function RoomPage() {
                         }
                         className={[
                             "w-full max-w-[520px] overflow-hidden rounded-2xl border shadow-[0_30px_100px_rgba(0,0,0,.20)]",
-                            isDark
-                                ? "border-white/10 bg-[#242429]"
-                                : "border-black/[0.08] bg-white",
+                            surfaceClass,
                         ].join(" ")}
                     >
-                        <div className="flex items-center gap-3 border-b border-black/[0.06] px-4 py-3">
-                            <Command className="h-4 w-4 text-[#777781]" />
+                        <div
+                            className={[
+                                "flex items-center gap-3 border-b px-4 py-3",
+                                isDark
+                                    ? "border-white/10"
+                                    : "border-black/[0.06]",
+                            ].join(" ")}
+                        >
+                            <Command
+                                className={[
+                                    "h-4 w-4",
+                                    mutedTextClass,
+                                ].join(" ")}
+                            />
 
                             <input
                                 autoFocus
@@ -908,74 +1528,68 @@ export default function RoomPage() {
 
                             <button
                                 type="button"
+                                aria-label="Close command palette"
                                 onClick={() =>
-                                    setMenuSearchOpen(
-                                        false
-                                    )
+                                    setMenuSearchOpen(false)
                                 }
-                                className="flex h-7 w-7 items-center justify-center rounded-md text-[#888891] hover:bg-black/[0.05]"
+                                className={[
+                                    "flex h-7 w-7 items-center justify-center rounded-md",
+                                    isDark
+                                        ? "text-white/55 hover:bg-white/[0.07]"
+                                        : "text-[#888891] hover:bg-black/[0.05]",
+                                ].join(" ")}
                             >
                                 <X className="h-4 w-4" />
                             </button>
                         </div>
 
                         <div className="p-2">
-                            {[
-                                {
-                                    label: "Select tool",
-                                    tool: "select" as ToolId,
-                                },
-                                {
-                                    label: "Draw",
-                                    tool: "draw" as ToolId,
-                                },
-                                {
-                                    label: "Rectangle",
-                                    tool: "rectangle" as ToolId,
-                                },
-                                {
-                                    label: "Ellipse",
-                                    tool: "ellipse" as ToolId,
-                                },
-                                {
-                                    label: "Text",
-                                    tool: "text" as ToolId,
-                                },
-                            ].map(
-                                (
-                                    commandItem
-                                ) => (
-                                    <button
-                                        key={
-                                            commandItem.label
-                                        }
-                                        type="button"
-                                        onClick={() => {
-                                            setActiveTool(
-                                                commandItem.tool
-                                            );
-
-                                            setMenuSearchOpen(
-                                                false
-                                            );
-
-                                            setMenuOpen(
-                                                false
-                                            );
-                                        }}
-                                        className={[
-                                            "flex w-full items-center rounded-lg px-3 py-2.5 text-left text-xs",
-                                            isDark
-                                                ? "text-white/60 hover:bg-white/[0.06]"
-                                                : "text-[#666670] hover:bg-[#f5f4fa]",
-                                        ].join(" ")}
-                                    >
-                                        {
-                                            commandItem.label
-                                        }
-                                    </button>
-                                )
-                            )}
+                            {(
+                                [
+                                    {
+                                        label: "Select tool",
+                                        tool: "select" as ToolId,
+                                    },
+                                    {
+                                        label: "Draw",
+                                        tool: "draw" as ToolId,
+                                    },
+                                    {
+                                        label: "Rectangle",
+                                        tool: "rectangle" as ToolId,
+                                    },
+                                    {
+                                        label: "Ellipse",
+                                        tool: "ellipse" as ToolId,
+                                    },
+                                    {
+                                        label: "Text",
+                                        tool: "text" as ToolId,
+                                    },
+                                    {
+                                        label: "Note",
+                                        tool: "note" as ToolId,
+                                    },
+                                ]
+                            ).map((commandItem) => (
+                                <button
+                                    key={commandItem.label}
+                                    type="button"
+                                    onClick={() => {
+                                        setActiveTool(commandItem.tool);
+                                        setMenuSearchOpen(false);
+                                        setMenuOpen(false);
+                                    }}
+                                    className={[
+                                        "flex w-full items-center rounded-lg px-3 py-2.5 text-left text-xs transition-colors",
+                                        isDark
+                                            ? "text-white/70 hover:bg-white/[0.06]"
+                                            : "text-[#666670] hover:bg-[#f5f4fa]",
+                                    ].join(" ")}
+                                >
+                                    {commandItem.label}
+                                </button>
+                            ))}
                         </div>
                     </div>
                 </div>

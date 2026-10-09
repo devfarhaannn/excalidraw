@@ -1,4 +1,6 @@
-import type { CanvasElement } from "../../types/whiteboard";
+import type {
+    CanvasElement,
+} from "../../types/whiteboard";
 
 type RenderCanvasOptions = {
     canvas: HTMLCanvasElement;
@@ -28,26 +30,14 @@ export function renderCanvas({
         return;
     }
 
-    const rect =
-        container.getBoundingClientRect();
+    const rect = container.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
 
-    const dpr =
-        window.devicePixelRatio || 1;
+    canvas.width = Math.round(rect.width * dpr);
+    canvas.height = Math.round(rect.height * dpr);
 
-    /*
-     * Set canvas resolution for Retina / high-DPI displays.
-     */
-    canvas.width =
-        Math.round(rect.width * dpr);
-
-    canvas.height =
-        Math.round(rect.height * dpr);
-
-    canvas.style.width =
-        `${rect.width}px`;
-
-    canvas.style.height =
-        `${rect.height}px`;
+    canvas.style.width = `${rect.width}px`;
+    canvas.style.height = `${rect.height}px`;
 
     ctx.setTransform(
         dpr,
@@ -58,9 +48,6 @@ export function renderCanvas({
         0
     );
 
-    /*
-     * Clear previous frame.
-     */
     ctx.clearRect(
         0,
         0,
@@ -68,9 +55,7 @@ export function renderCanvas({
         rect.height
     );
 
-    /*
-     * Draw canvas background.
-     */
+    // Canvas background.
     ctx.fillStyle = background;
 
     ctx.fillRect(
@@ -80,9 +65,7 @@ export function renderCanvas({
         rect.height
     );
 
-    /*
-     * Move into whiteboard world coordinates.
-     */
+    // Transform into whiteboard world coordinates.
     ctx.save();
 
     ctx.translate(
@@ -95,240 +78,131 @@ export function renderCanvas({
         zoom / 100
     );
 
-    /*
-     * Draw all whiteboard elements.
-     */
     for (const element of elements) {
-        drawElement(
-            ctx,
-            element,
-            dark
-        );
+        drawElement(ctx, element, dark);
     }
 
     ctx.restore();
 }
-
-
 
 function drawElement(
     ctx: CanvasRenderingContext2D,
     element: CanvasElement,
     dark: boolean
 ) {
-    const strokeColor = dark
+    const defaultStrokeColor = dark
         ? "#f4f4f5"
         : "#27272a";
 
+    const strokeColor =
+        element.strokeColor ?? defaultStrokeColor;
+
     ctx.save();
 
-    ctx.strokeStyle =
-        strokeColor;
-
-    ctx.fillStyle =
-        strokeColor;
-
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = strokeColor;
+    ctx.fillStyle = strokeColor;
+    ctx.lineWidth = element.strokeWidth ?? 2;
+    ctx.globalAlpha = element.opacity ?? 1;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
 
+    // RECTANGLE
+    if (element.type === "rectangle") {
+        const x = Math.min(element.x1, element.x2);
+        const y = Math.min(element.y1, element.y2);
+        const width = Math.abs(element.x2 - element.x1);
+        const height = Math.abs(element.y2 - element.y1);
 
-    if (
-        element.type === "rectangle"
-    ) {
-        const x =
-            Math.min(
-                element.x1,
-                element.x2
-            );
+        if (element.fillColor) {
+            ctx.fillStyle = element.fillColor;
+            ctx.fillRect(x, y, width, height);
+        }
 
-        const y =
-            Math.min(
-                element.y1,
-                element.y2
-            );
-
-        const width =
-            Math.abs(
-                element.x2 -
-                element.x1
-            );
-
-        const height =
-            Math.abs(
-                element.y2 -
-                element.y1
-            );
-
-        ctx.strokeRect(
-            x,
-            y,
-            width,
-            height
-        );
+        ctx.strokeStyle = strokeColor;
+        ctx.strokeRect(x, y, width, height);
 
         ctx.restore();
-
         return;
     }
 
+    // DIAMOND
+    if (element.type === "diamond") {
+        const left = Math.min(element.x1, element.x2);
+        const right = Math.max(element.x1, element.x2);
+        const top = Math.min(element.y1, element.y2);
+        const bottom = Math.max(element.y1, element.y2);
 
-
-    if (
-        element.type === "diamond"
-    ) {
-        const left =
-            Math.min(
-                element.x1,
-                element.x2
-            );
-
-        const right =
-            Math.max(
-                element.x1,
-                element.x2
-            );
-
-        const top =
-            Math.min(
-                element.y1,
-                element.y2
-            );
-
-        const bottom =
-            Math.max(
-                element.y1,
-                element.y2
-            );
-
-        const centerX =
-            (left + right) / 2;
-
-        const centerY =
-            (top + bottom) / 2;
+        const centerX = (left + right) / 2;
+        const centerY = (top + bottom) / 2;
 
         ctx.beginPath();
-
-        ctx.moveTo(
-            centerX,
-            top
-        );
-
-        ctx.lineTo(
-            right,
-            centerY
-        );
-
-        ctx.lineTo(
-            centerX,
-            bottom
-        );
-
-        ctx.lineTo(
-            left,
-            centerY
-        );
-
+        ctx.moveTo(centerX, top);
+        ctx.lineTo(right, centerY);
+        ctx.lineTo(centerX, bottom);
+        ctx.lineTo(left, centerY);
         ctx.closePath();
 
+        if (element.fillColor) {
+            ctx.fillStyle = element.fillColor;
+            ctx.fill();
+        }
+
+        ctx.strokeStyle = strokeColor;
         ctx.stroke();
 
         ctx.restore();
-
         return;
     }
 
-
-
-    if (
-        element.type === "ellipse"
-    ) {
-        const centerX =
-            (element.x1 +
-                element.x2) /
-            2;
-
-        const centerY =
-            (element.y1 +
-                element.y2) /
-            2;
-
-        const radiusX =
-            Math.abs(
-                element.x2 -
-                element.x1
-            ) / 2;
-
-        const radiusY =
-            Math.abs(
-                element.y2 -
-                element.y1
-            ) / 2;
+    // ELLIPSE
+    if (element.type === "ellipse") {
+        const centerX = (element.x1 + element.x2) / 2;
+        const centerY = (element.y1 + element.y2) / 2;
+        const radiusX = Math.abs(element.x2 - element.x1) / 2;
+        const radiusY = Math.abs(element.y2 - element.y1) / 2;
 
         ctx.beginPath();
 
         ctx.ellipse(
             centerX,
             centerY,
-            Math.max(
-                radiusX,
-                1
-            ),
-            Math.max(
-                radiusY,
-                1
-            ),
+            Math.max(radiusX, 1),
+            Math.max(radiusY, 1),
             0,
             0,
             Math.PI * 2
         );
 
+        if (element.fillColor) {
+            ctx.fillStyle = element.fillColor;
+            ctx.fill();
+        }
+
+        ctx.strokeStyle = strokeColor;
         ctx.stroke();
 
         ctx.restore();
-
         return;
     }
 
-
-    if (
-        element.type === "line"
-    ) {
+    // LINE
+    if (element.type === "line") {
         ctx.beginPath();
-
-        ctx.moveTo(
-            element.x1,
-            element.y1
-        );
-
-        ctx.lineTo(
-            element.x2,
-            element.y2
-        );
-
+        ctx.moveTo(element.x1, element.y1);
+        ctx.lineTo(element.x2, element.y2);
+        ctx.strokeStyle = strokeColor;
         ctx.stroke();
 
         ctx.restore();
-
         return;
     }
 
-
-    if (
-        element.type === "arrow"
-    ) {
+    // ARROW
+    if (element.type === "arrow") {
         ctx.beginPath();
-
-        ctx.moveTo(
-            element.x1,
-            element.y1
-        );
-
-        ctx.lineTo(
-            element.x2,
-            element.y2
-        );
-
+        ctx.moveTo(element.x1, element.y1);
+        ctx.lineTo(element.x2, element.y2);
+        ctx.strokeStyle = strokeColor;
         ctx.stroke();
 
         drawArrowHead(
@@ -340,16 +214,12 @@ function drawElement(
         );
 
         ctx.restore();
-
         return;
     }
 
-
-    if (
-        element.type === "draw"
-    ) {
-        const firstPoint =
-            element.points[0];
+    // FREEHAND DRAWING
+    if (element.type === "draw") {
+        const firstPoint = element.points[0];
 
         if (!firstPoint) {
             ctx.restore();
@@ -357,48 +227,34 @@ function drawElement(
         }
 
         ctx.beginPath();
+        ctx.moveTo(firstPoint.x, firstPoint.y);
 
-        ctx.moveTo(
-            firstPoint.x,
-            firstPoint.y
-        );
-
-        for (
-            let i = 1;
-            i < element.points.length;
-            i++
-        ) {
-            const point =
-                element.points[i];
+        for (let i = 1; i < element.points.length; i++) {
+            const point = element.points[i];
 
             if (!point) {
                 continue;
             }
 
-            ctx.lineTo(
-                point.x,
-                point.y
-            );
+            ctx.lineTo(point.x, point.y);
         }
 
+        ctx.strokeStyle = strokeColor;
         ctx.stroke();
 
         ctx.restore();
-
         return;
     }
 
-    if (
-        element.type === "text"
-    ) {
-        const fontSize =
-            element.fontSize ?? 20;
+    // TEXT
+    if (element.type === "text") {
+        const fontSize = element.fontSize ?? 20;
 
         ctx.font =
             `${fontSize}px Inter, Arial, sans-serif`;
 
-        ctx.textBaseline =
-            "top";
+        ctx.textBaseline = "top";
+        ctx.fillStyle = element.textColor ?? strokeColor;
 
         ctx.fillText(
             element.text,
@@ -407,19 +263,13 @@ function drawElement(
         );
 
         ctx.restore();
-
         return;
     }
 
-
-    if (
-        element.type === "note"
-    ) {
+    // NOTE
+    if (element.type === "note") {
         ctx.fillStyle =
-            "#fff3a8";
-
-        ctx.strokeStyle =
-            "#d8c95f";
+            element.fillColor ?? "#fff3a8";
 
         ctx.fillRect(
             element.x,
@@ -427,6 +277,9 @@ function drawElement(
             element.width,
             element.height
         );
+
+        ctx.strokeStyle =
+            element.strokeColor ?? "#d8c95f";
 
         ctx.strokeRect(
             element.x,
@@ -436,13 +289,12 @@ function drawElement(
         );
 
         ctx.fillStyle =
-            "#403d2e";
+            element.textColor ?? "#403d2e";
 
         ctx.font =
             "14px Inter, Arial, sans-serif";
 
-        ctx.textBaseline =
-            "top";
+        ctx.textBaseline = "top";
 
         drawWrappedText(
             ctx,
@@ -453,13 +305,11 @@ function drawElement(
         );
 
         ctx.restore();
-
         return;
     }
 
     ctx.restore();
 }
-
 
 function drawArrowHead(
     ctx: CanvasRenderingContext2D,
@@ -468,65 +318,27 @@ function drawArrowHead(
     x2: number,
     y2: number
 ) {
-    const angle =
-        Math.atan2(
-            y2 - y1,
-            x2 - x1
-        );
-
+    const angle = Math.atan2(y2 - y1, x2 - x1);
     const size = 10;
 
     ctx.beginPath();
 
-    /*
-     * First wing
-     */
-    ctx.moveTo(
-        x2,
-        y2
-    );
+    ctx.moveTo(x2, y2);
 
     ctx.lineTo(
-        x2 -
-        size *
-        Math.cos(
-            angle -
-            Math.PI / 6
-        ),
-        y2 -
-        size *
-        Math.sin(
-            angle -
-            Math.PI / 6
-        )
+        x2 - size * Math.cos(angle - Math.PI / 6),
+        y2 - size * Math.sin(angle - Math.PI / 6)
     );
 
-    /*
-     * Second wing
-     */
-    ctx.moveTo(
-        x2,
-        y2
-    );
+    ctx.moveTo(x2, y2);
 
     ctx.lineTo(
-        x2 -
-        size *
-        Math.cos(
-            angle +
-            Math.PI / 6
-        ),
-        y2 -
-        size *
-        Math.sin(
-            angle +
-            Math.PI / 6
-        )
+        x2 - size * Math.cos(angle + Math.PI / 6),
+        y2 - size * Math.sin(angle + Math.PI / 6)
     );
 
     ctx.stroke();
 }
-
 
 function drawWrappedText(
     ctx: CanvasRenderingContext2D,
@@ -535,8 +347,7 @@ function drawWrappedText(
     y: number,
     maxWidth: number
 ) {
-    const words =
-        text.split(" ");
+    const words = text.split(/\s+/);
 
     let line = "";
     let lineY = y;
@@ -549,19 +360,10 @@ function drawWrappedText(
             : word;
 
         const width =
-            ctx.measureText(
-                testLine
-            ).width;
+            ctx.measureText(testLine).width;
 
-        if (
-            width > maxWidth &&
-            line
-        ) {
-            ctx.fillText(
-                line,
-                x,
-                lineY
-            );
+        if (width > maxWidth && line) {
+            ctx.fillText(line, x, lineY);
 
             line = word;
             lineY += lineHeight;
@@ -571,10 +373,6 @@ function drawWrappedText(
     }
 
     if (line) {
-        ctx.fillText(
-            line,
-            x,
-            lineY
-        );
+        ctx.fillText(line, x, lineY);
     }
 }

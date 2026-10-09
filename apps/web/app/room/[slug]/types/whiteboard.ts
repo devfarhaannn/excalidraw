@@ -17,9 +17,26 @@ export type Point = {
     y: number;
 };
 
+export type ElementStyle = {
+    strokeColor?: string | undefined;
+    fillColor?: string | undefined;
+    textColor?: string | undefined;
+    strokeWidth?: number;
+    opacity?: number;
+};
+
+export type ElementStylePatch = Partial<ElementStyle> & {
+    fontSize?: number;
+};
+
+export type ElementPropertyUpdater = (
+    id: number,
+    patch: ElementStylePatch
+) => void;
+
 export type BaseElement = {
     id: number;
-};
+} & ElementStyle;
 
 export type ShapeElement = BaseElement & {
     type:
@@ -39,8 +56,7 @@ export type DrawElement = BaseElement & {
     points: Point[];
 };
 
-export type TextElement = {
-    id: number;
+export type TextElement = BaseElement & {
     type: "text";
     x: number;
     y: number;
